@@ -150,21 +150,3 @@ impl Serialize for DatetimeChunked {
         state.end()
     }
 }
-
-#[cfg(feature = "dtype-time")]
-impl Serialize for TimeChunked {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> std::result::Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_map(Some(3))?;
-        state.serialize_entry("name", self.name())?;
-        let dtype: DeDataType = self.dtype().into();
-        state.serialize_entry("datatype", &dtype)?;
-        state.serialize_entry("values", &IterSer::new(self.as_time_iter()))?;
-        state.end()
-    }
-}
