@@ -107,7 +107,7 @@ mod test {
     }
 
     fn sample_dataframe() -> DataFrame {
-        let s1: Series = Series::new("foo", &[1, 2, 3]);
+        let s1 = Series::new("foo", &[1, 2, 3]);
         let s2 = Series::new("bar", &[Some(true), None, Some(false)]);
         let s3 = Series::new("utf8", &["mouse", "elephant", "dog"]);
         let s4 = Series::new(
