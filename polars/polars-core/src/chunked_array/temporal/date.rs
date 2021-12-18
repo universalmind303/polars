@@ -81,6 +81,7 @@ impl DateChunked {
         Int32Chunked::new_from_aligned_vec(name, unit).into()
     }
 
+
     pub fn parse_from_str_slice(name: &str, v: &[&str], fmt: &str) -> Self {
         Int32Chunked::new_from_opt_iter(
             name,

@@ -156,6 +156,16 @@ impl<'de> Deserialize<'de> for Series {
                             .map(|s| s.into_series())
                             .unwrap())
                     }
+                    #[cfg(feature = "dtype-time")]
+                    DeDataType::Time => {
+                        let values: Vec<Option<String>> = map.next_value()?;
+                        Ok(Series::new(&name, values)
+                            .utf8()
+                            .unwrap()
+                            .as_time(None)
+                            .map(|s| s.into_series())
+                            .unwrap())
+                    }
                     DeDataType::Boolean => {
                         let values: Vec<Option<bool>> = map.next_value()?;
                         Ok(Series::new(&name, values))

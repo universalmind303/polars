@@ -114,39 +114,31 @@ impl Serialize for CategoricalChunked {
         ca.serialize(serializer)
     }
 }
+
+macro_rules! impl_serialize_logical {
+    ($ca: ident, $method: ident) => {
+        impl Serialize for $ca {
+            fn serialize<S>(
+                &self,
+                serializer: S,
+            ) -> std::result::Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+            where
+                S: Serializer,
+            {
+                let mut state = serializer.serialize_map(Some(3))?;
+                state.serialize_entry("name", self.name())?;
+                let dtype: DeDataType = self.dtype().into();
+                state.serialize_entry("datatype", &dtype)?;
+                state.serialize_entry("values", &IterSer::new(self.$method()))?;
+                state.end()
+            }
+        }
+    };
+}
+
 #[cfg(feature = "dtype-date")]
-impl Serialize for DateChunked {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> std::result::Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_map(Some(3))?;
-        state.serialize_entry("name", self.name())?;
-        let dtype: DeDataType = self.dtype().into();
-        state.serialize_entry("datatype", &dtype)?;
-
-        state.serialize_entry("values", &IterSer::new(self.as_date_iter()))?;
-        state.end()
-    }
-}
+impl_serialize_logical!(DateChunked, as_date_iter);
 #[cfg(feature = "dtype-datetime")]
-impl Serialize for DatetimeChunked {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> std::result::Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_map(Some(3))?;
-        state.serialize_entry("name", self.name())?;
-        let dtype: DeDataType = self.dtype().into();
-        state.serialize_entry("datatype", &dtype)?;
-
-        state.serialize_entry("values", &IterSer::new(self.as_datetime_iter()))?;
-        state.end()
-    }
-}
+impl_serialize_logical!(DatetimeChunked, as_datetime_iter);
+#[cfg(feature = "dtype-time")]
+impl_serialize_logical!(TimeChunked, as_time_iter);

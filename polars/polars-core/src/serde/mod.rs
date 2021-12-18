@@ -39,6 +39,7 @@ enum DeDataType<'a> {
     Utf8,
     Date,
     Datetime,
+    Time,
     #[serde(with = "TimeUnitDef")]
     Time64(TimeUnit),
     List,
@@ -56,6 +57,7 @@ impl From<&DataType> for DeDataType<'_> {
             DataType::UInt64 => DeDataType::UInt64,
             DataType::Date => DeDataType::Date,
             DataType::Datetime => DeDataType::Datetime,
+            DataType::Time => DeDataType::Time,
             DataType::Float32 => DeDataType::Float32,
             DataType::Float64 => DeDataType::Float64,
             DataType::Utf8 => DeDataType::Utf8,
@@ -156,5 +158,33 @@ mod test {
         let bytes = bincode::serialize(&df).unwrap();
         let out = bincode::deserialize_from::<_, DataFrame>(bytes.as_slice()).unwrap(); // uses `DeserializeOwned`
         assert!(df.frame_equal_missing(&out));
+    }
+    #[test]
+    fn test_serde_df_logical_types() {
+        let json = r#"{
+            "columns": [
+                { 
+                    "name": "date",
+                    "datatype": "Date",
+                    "values": ["2015/09/05", null, "2016/09/05"]
+                }
+            ]   
+        }"#;
+        let df = serde_json::from_str::<DataFrame>(&json).unwrap(); // uses `Deserialize<'de>`
+        dbg!(&df);
+
+        let date = Series::new("date", &[Some(16683), None, Some(17049)])
+            .cast(&DataType::Date)
+            .unwrap();
+
+        let datetime = Series::new(
+            "datetime",
+            &[Some(1441497364000i64), None, Some(1583452564000i64)],
+        )
+        .cast(&DataType::Datetime)
+        .unwrap();
+        let expected = DataFrame::new(vec![date, datetime]).unwrap();
+        dbg!(&expected);
+        assert!(df.frame_equal_missing(&expected));
     }
 }
