@@ -76,23 +76,6 @@ where
     }
 }
 
-impl<K: PolarsDataType, T: PolarsNumericType> Serialize for Logical<K, T>
-where
-    Self: LogicalType,
-    ChunkedArray<T>: Serialize,
-    T::Native: Serialize,
-{
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> std::result::Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        serialize_impl(serializer, self.name(), self.dtype(), self)
-    }
-}
-
 macro_rules! impl_serialize {
     ($ca: ident) => {
         impl Serialize for $ca {
@@ -129,5 +112,59 @@ impl Serialize for CategoricalChunked {
     {
         let ca = self.cast(&DataType::Utf8).unwrap();
         ca.serialize(serializer)
+    }
+}
+#[cfg(feature = "dtype-date")]
+impl Serialize for DateChunked {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_map(Some(3))?;
+        state.serialize_entry("name", self.name())?;
+        let dtype: DeDataType = self.dtype().into();
+        state.serialize_entry("datatype", &dtype)?;
+
+        state.serialize_entry("values", &IterSer::new(self.as_date_iter()))?;
+        state.end()
+    }
+}
+#[cfg(feature = "dtype-datetime")]
+impl Serialize for DatetimeChunked {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_map(Some(3))?;
+        state.serialize_entry("name", self.name())?;
+        let dtype: DeDataType = self.dtype().into();
+        state.serialize_entry("datatype", &dtype)?;
+
+        state.serialize_entry("values", &IterSer::new(self.as_datetime_iter()))?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "dtype-time")]
+impl Serialize for TimeChunked {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_map(Some(3))?;
+        state.serialize_entry("name", self.name())?;
+        let dtype: DeDataType = self.dtype().into();
+        state.serialize_entry("datatype", &dtype)?;
+        state.serialize_entry("values", &IterSer::new(self.as_time_iter()))?;
+        state.end()
     }
 }

@@ -136,14 +136,24 @@ impl<'de> Deserialize<'de> for Series {
                     }
                     #[cfg(feature = "dtype-date")]
                     DeDataType::Date => {
-                        let values: Vec<Option<i32>> = map.next_value()?;
-                        Ok(Series::new(&name, values).cast(&DataType::Date).unwrap())
+                        let values: Vec<Option<String>> = map.next_value()?;
+
+                        Ok(Series::new(&name, values)
+                            .utf8()
+                            .unwrap()
+                            .as_date(None)
+                            .map(|s| s.into_series())
+                            .unwrap())
                     }
                     #[cfg(feature = "dtype-datetime")]
                     DeDataType::Datetime => {
-                        let values: Vec<Option<i64>> = map.next_value()?;
+                        let values: Vec<Option<String>> = map.next_value()?;
+
                         Ok(Series::new(&name, values)
-                            .cast(&DataType::Datetime)
+                            .utf8()
+                            .unwrap()
+                            .as_datetime(None)
+                            .map(|s| s.into_series())
                             .unwrap())
                     }
                     DeDataType::Boolean => {
