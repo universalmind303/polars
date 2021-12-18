@@ -124,11 +124,9 @@ mod test {
     #[test]
     fn test_serde_df_json() {
         let df = sample_dataframe();
-        dbg!(&df);
         let json = serde_json::to_string(&df).unwrap();
         dbg!(&json);
         let out = serde_json::from_str::<DataFrame>(&json).unwrap(); // uses `Deserialize<'de>`
-        dbg!(&out);
         assert!(df.frame_equal_missing(&out));
     }
 
