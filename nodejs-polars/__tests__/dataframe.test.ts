@@ -859,6 +859,7 @@ describe("dataframe", () => {
       "bar": "bar_new",
       "ham": "ham_new"
     });
+
     expect(actual.columns).toEqual(["foo_new", "bar_new", "ham_new"]);
   });
   test("replaceAtIdx", ()=>{

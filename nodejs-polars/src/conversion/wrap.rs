@@ -1,6 +1,5 @@
 use crate::conversion::prelude::*;
 use crate::error::JsPolarsEr;
-use crate::series::JsSeries;
 use napi::{CallContext, JsExternal, JsObject, JsUnknown, Result};
 use polars::chunked_array::object::PolarsObjectSafe;
 
@@ -51,12 +50,6 @@ impl WrappedObject {
             v.push(item)
         }
         Ok((v, len as usize))
-    }
-
-    pub fn get_series<'a>(&'a self, cx: &'a CallContext, key: &str) -> Result<&'a JsSeries> {
-        let v: JsExternal = self.0.get_named_property(key)?;
-        let s: &JsSeries = cx.env.get_value_external(&v)?;
-        Ok(s)
     }
 
     pub fn get_external<'a, Out: 'static>(

@@ -7,6 +7,7 @@ import {Expr} from "./lazy/expr";
 import {todo} from "./error";
 import {Series, seriesWrapper} from "./series";
 import {Stream} from "stream";
+import {isExternal} from "util/types";
 
 import {
   DataType,
@@ -21,8 +22,6 @@ import {
   ColumnSelection,
   DownsampleRule,
   FillNullStrategy,
-  isExpr,
-  isSeries,
   isSeriesArray,
   ColumnsOrExpr,
   ValueOrArray,
@@ -1175,7 +1174,7 @@ export interface DataFrame {
 }
 
 function prepareOtherArg<T>(anyValue:T | Series<T>): Series<T> {
-  if(isSeries(anyValue)) {
+  if(Series.isSeries(anyValue)) {
 
     return anyValue;
   } else {
@@ -1207,7 +1206,7 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
     *[Symbol.iterator]() {
 
       let start = 0;
-      let len = this.height;
+      let len = this.width;
 
       while (start < len) {
         const s = this.toSeries(start);
@@ -1409,13 +1408,11 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
     quantile: (quantile) => wrap("quantile", {quantile}),
     rechunk: noArgWrap("rechunk"),
     rename(mapping)  {
-      const df = this.clone();
-
       Object.entries(mapping).forEach(([column, new_col]) => {
-        unwrap("rename", {column, new_col}, df._df);
+        unwrap("rename", {column, new_col});
       });
 
-      return df;
+      return this;
     },
     replaceAtIdx(index, newColumn) {
       unwrap("replace_at_idx", {
@@ -1448,7 +1445,7 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
     },
     schema: noArgUnwrap("schema"),
     select(...selection) {
-      const hasExpr = selection.flat().some(s => isExpr(s));
+      const hasExpr = selection.flat().some(s => Expr.isExpr(s));
       if(hasExpr) {
         return dfWrapper(_df)
           .lazy()
@@ -1487,7 +1484,7 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
       if(arg?.by  !== undefined) {
         return this.sort(arg.by, arg.reverse);
       }
-      if(Array.isArray(arg) || isExpr(arg)) {
+      if(Array.isArray(arg) || Expr.isExpr(arg)) {
         return dfWrapper(_df).lazy()
           .sort(arg, reverse)
           .collectSync({noOptimization: true, stringCache: false});
@@ -1603,7 +1600,7 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
     upsample: (index) => {throw todo();},
     vstack: (other) => wrap("vstack", {other: other._df}),
     withColumn(column: Series<any> | Expr) {
-      if(isSeries(column)) {
+      if(Series.isSeries(column)) {
         return wrap("with_column", {_series: column._series});
       } else {
         return this.withColumns(column);
@@ -1636,41 +1633,49 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
   } as any as DataFrame;
 
   return new Proxy(df, {
-    get: function(target: DataFrame, prop, receiver) {
+    get(target: DataFrame, prop, receiver) {
       if(typeof prop === "string" && target.columns.includes(prop)) {
+
         return target.getColumn(prop);
-      }
-      if(Array.isArray(prop) && target.columns.includes(prop[0])) {
-        return target.select(prop as any);
-      }
-      if(typeof prop !== "symbol" && !Number.isNaN(Number(prop))) {
+      } if(typeof prop !== "symbol" && !Number.isNaN(Number(prop))) {
+
         return target.row(Number(prop));
       } else {
+
         return Reflect.get(target, prop, receiver);
       }
     },
+    set(target: DataFrame, prop, receiver) {
+      if(Series.isSeries(receiver)) {
+        if(typeof prop === "string" && target.columns.includes(prop)) {
+          const idx = target.columns.indexOf(prop);
+          target.replaceAtIdx(idx, receiver.alias(prop));
 
-    // set: function(target: DataFrame, prop, receiver) {
-    //   console.log({prop, receiver});
-    //   if(isSeries(receiver)) {
-    //     if(typeof prop === "string" && target.columns.includes(prop)) {
-    //       const idx = target.columns.indexOf(prop);
-    //       target.replaceAtIdx(idx, receiver.alias(prop));
-    //       console.log({target, receiver});
+          return true;
+        }
+        if(typeof prop !== "symbol" && !Number.isNaN(Number(prop))) {
+          target.replaceAtIdx(Number(prop), receiver);
 
-    //       return true;
-    //     }
-    //     if(typeof prop !== "symbol" && !Number.isNaN(Number(prop))) {
-    //       target.replaceAtIdx(Number(prop), receiver);
+          return true;
+        }
+      }
 
-    //       return true;
-    //     }
-    //   }
+      Reflect.set(target, prop, receiver);
 
-    //   return Reflect.set(target, prop, receiver);
-    // },
-    has: function(target, p) {
+      return true;
+    },
+    has(target, p) {
       return target.columns.includes(p as any);
+    },
+    ownKeys(target) {
+      return target.columns as any;
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      return {
+        configurable: true,
+        enumerable: true,
+        value: target.getColumn(prop as any)
+      };
     }
   });
 
@@ -1756,13 +1761,13 @@ export const _wrapDataFrame = (df, method, args) => dfWrapper(pli.df[method]({_d
   ╰─────┴─────┴─────╯
   ```
  */
-export function DataFrame(): DataFrame
-export function DataFrame(data: Record<string, any>): DataFrame
-export function DataFrame(data: Record<string, any>[]): DataFrame
-export function DataFrame(data: Series<any>[]): DataFrame
-export function DataFrame(data: any[][]): DataFrame
-export function DataFrame(data: any[][], options: {columns?: any[], orient?: "row" | "col"}): DataFrame
-export function DataFrame(data?: Record<string, any[]> | Record<string, any>[] | any[][] | Series<any>[], options?: {columns?: any[], orient?: "row" | "col"}): DataFrame {
+function _DataFrame(): DataFrame
+function _DataFrame(data: Record<string, any>): DataFrame
+function _DataFrame(data: Record<string, any>[]): DataFrame
+function _DataFrame(data: Series<any>[]): DataFrame
+function _DataFrame(data: any[][]): DataFrame
+function _DataFrame(data: any[][], options: {columns?: any[], orient?: "row" | "col"}): DataFrame
+function _DataFrame(data?: Record<string, any[]> | Record<string, any>[] | any[][] | Series<any>[], options?: {columns?: any[], orient?: "row" | "col"}): DataFrame {
 
   if(!data) {
     return dfWrapper(objToDF({}));
@@ -1776,7 +1781,16 @@ export function DataFrame(data?: Record<string, any[]> | Record<string, any>[] |
 }
 
 function objToDF(obj: Record<string, Array<any>>): any {
-  const columns =  Object.entries(obj).map(([key, value]) => Series(key, value)._series);
+  const columns =  Object.entries(obj).map(([key, value]) => {
+    if(Series.isSeries(value)) {
+      return value._series;
+    }
+
+    return Series(key, value)._series;
+  });
 
   return pli.df.read_columns({columns});
 }
+
+const isDataFrame = (ty: any): ty is DataFrame => isExternal(ty?._df);
+export const DataFrame = Object.assign(_DataFrame, {isDataFrame});

@@ -3,7 +3,7 @@ import {jsTypeToPolarsType} from "./internals/construction";
 import {Series, seriesWrapper} from "./series";
 import {DataFrame} from "./dataframe";
 import pli from "./internals/polars_internal";
-import {isDataFrameArray, isSeriesArray} from "./utils";
+import * as utils from "./utils";
 
 type ConcatOptions = {rechunk: boolean, how?: "vertical"}
 
@@ -43,13 +43,13 @@ export function concat<T>(items, options: ConcatOptions =  {rechunk: true, how: 
     throw new Error("unsupported operation. only 'vertical' is supported at this time");
   }
 
-  if(isDataFrameArray(items)) {
+  if(utils.isDataFrameArray(items)) {
     const df =  items.reduce((acc, curr) => acc.vstack(curr));
 
     return rechunk ? df.rechunk() : df;
   }
 
-  if(isSeriesArray<T>(items)) {
+  if(utils.isSeriesArray<T>(items)) {
     const s =  items.reduce((acc, curr) => acc.concat(curr));
 
     return rechunk ? s.rechunk() : s;

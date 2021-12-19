@@ -296,7 +296,7 @@ export const LazyDataFrame = (ldf: JsLazyFrame): LazyDataFrame => {
     collectSync: () => dfWrapper(unwrap("collectSync")),
     collect: () => unwrap("collect").then(dfWrapper),
     drop: (...cols) => wrap("dropColumns", {cols: cols.flat(2)}),
-    dropDuplicates(opts:any=true, subset?){
+    dropDuplicates(opts:any=true, subset?) {
       if(opts?.maintainOrder !== undefined) {
         return this.dropDuplicates(opts.maintainOrder, opts.subset);
       }
@@ -439,8 +439,8 @@ export const LazyDataFrame = (ldf: JsLazyFrame): LazyDataFrame => {
 
       return wrap("slice", {offset: opt, len});
     },
-    sort(arg, reverse=false)  {
-      if(arg?.by  !== undefined) {
+    sort(arg, reverse=false) {
+      if(arg?.by !== undefined) {
         return this.sort(arg.by, arg.reverse);
       }
       if(typeof arg === "string") {
@@ -457,7 +457,7 @@ export const LazyDataFrame = (ldf: JsLazyFrame): LazyDataFrame => {
     var: wrapNullArgs("var"),
     tail: (length=5) => wrap("tail", {length}),
     withColumn: (expr) => wrap("withColumn", {expr: expr._expr}),
-    withColumns(...columns){
+    withColumns(...columns) {
       const exprs = selectionToExprList(columns, false);
 
       return wrap("withColumns", {exprs});

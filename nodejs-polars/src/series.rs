@@ -1,5 +1,4 @@
 use crate::conversion::prelude::*;
-use crate::dataframe::JsDataFrame;
 use crate::datatypes::JsDataType;
 use crate::error::JsPolarsEr;
 use crate::list_construction::from_typed_array;
@@ -8,7 +7,6 @@ use crate::prelude::JsResult;
 use napi::Either;
 use napi::JsBoolean;
 use napi::JsExternal;
-use napi::JsFunction;
 use napi::JsNumber;
 use napi::JsTypedArray;
 use napi::JsUndefined;
@@ -17,22 +15,8 @@ use napi::{CallContext, JsNull, JsObject, JsString, ValueType};
 use polars::prelude::*;
 use polars_core::utils::CustomIterTools;
 
-#[repr(transparent)]
-#[derive(Clone)]
-pub struct JsSeries {
-    pub(crate) series: Series,
-}
+pub struct JsSeries {}
 
-impl From<Series> for JsSeries {
-    fn from(series: Series) -> Self {
-        Self { series }
-    }
-}
-impl JsSeries {
-    pub(crate) fn new(series: Series) -> Self {
-        JsSeries { series }
-    }
-}
 impl IntoJs<JsExternal> for Series {
     fn try_into_js(self, cx: &CallContext) -> JsResult<JsExternal> {
         cx.env.create_external(self, None)
@@ -361,31 +345,31 @@ pub fn sum(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn slice(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let offset = params.get_as::<i64>("offset")?;
     let length = params.get_as::<usize>("length")?;
-    let series = series.series.slice(offset, length);
-    JsSeries::new(series).try_into_js(&cx)
+    series.slice(offset, length).try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn append(cx: CallContext) -> JsResult<JsUndefined> {
     let params = get_params(&cx)?;
-    let series = params.get_external_mut::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    series.series.append(&other.series).unwrap();
+    let series = params.get_external_mut::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    series.append(other).map_err(JsPolarsEr::from)?;
     cx.env.get_undefined()
 }
 
 #[js_function(1)]
 pub fn filter(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let filter = params.get_external::<JsSeries>(&cx, "filter")?;
-    let filter_series = &filter.series;
-    if let Ok(ca) = filter_series.bool() {
-        let series = series.series.filter(ca).map_err(JsPolarsEr::from)?;
-        JsSeries::new(series).try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let filter = params.get_external::<Series>(&cx, "filter")?;
+    if let Ok(ca) = filter.bool() {
+        series
+            .filter(ca)
+            .map_err(JsPolarsEr::from)?
+            .try_into_js(&cx)
     } else {
         Err(JsPolarsEr::Other(String::from("Expected a boolean mask")).into())
     }
@@ -394,46 +378,41 @@ pub fn filter(cx: CallContext) -> JsResult<JsExternal> {
 #[js_function(1)]
 pub fn add(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let series: JsSeries = (&series.series + &other.series).into();
-    series.try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    (series + other).try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn sub(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let series: JsSeries = (&series.series - &other.series).into();
-    series.try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    (series - other).try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn mul(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let series: JsSeries = (&series.series * &other.series).into();
-    series.try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    (series * other).try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn div(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let series: JsSeries = (&series.series / &other.series).into();
-    series.try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    (series / other).try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn rem(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let series: JsSeries = (&series.series % &other.series).into();
-    series.try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    (series % other).try_into_js(&cx)
 }
 
 #[js_function(1)]
@@ -444,16 +423,18 @@ pub fn sort_in_place(_: CallContext) -> JsResult<JsExternal> {
 #[js_function(1)]
 pub fn value_counts(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let df = series.series.value_counts().map_err(JsPolarsEr::from)?;
-    JsDataFrame::from(df).try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    series
+        .value_counts()
+        .map_err(JsPolarsEr::from)?
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn arg_min(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let arg_min = series.series.arg_min();
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let arg_min = series.arg_min();
     match arg_min {
         Some(v) => cx.env.create_uint32(v as u32).map(|v| v.into_unknown()),
         None => cx.env.get_undefined().map(|v| v.into_unknown()),
@@ -463,8 +444,8 @@ pub fn arg_min(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn arg_max(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let arg_max = series.series.arg_max();
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let arg_max = series.arg_max();
     match arg_max {
         Some(v) => cx.env.create_uint32(v as u32).map(|v| v.into_unknown()),
         None => cx.env.get_undefined().map(|v| v.into_unknown()),
@@ -474,33 +455,34 @@ pub fn arg_max(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn take(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let indices = params.get_as::<Vec<u32>>("indices")?;
     let chunked: UInt32Chunked = indices.into_iter().map(Some).collect();
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let take = series.series.take(&chunked).map_err(JsPolarsEr::from)?;
-    JsSeries::new(take).try_into_js(&cx)
+    series
+        .take(&chunked)
+        .map_err(JsPolarsEr::from)?
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn take_with_series(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let indices = params.get_external::<JsSeries>(&cx, "indices")?;
-    let idx = indices.series.u32().map_err(JsPolarsEr::from)?;
-    let take = series.series.take(idx).map_err(JsPolarsEr::from)?;
-    JsSeries::new(take).try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let indices = params.get_external::<Series>(&cx, "indices")?;
+    let idx = indices.u32().map_err(JsPolarsEr::from)?;
+    series.take(idx).map_err(JsPolarsEr::from)?.try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn series_equal(cx: CallContext) -> JsResult<JsBoolean> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
     let null_equal = params.get_as::<bool>("null_equal")?;
     let b = if null_equal {
-        series.series.series_equal_missing(&other.series)
+        series.series_equal_missing(other)
     } else {
-        series.series.series_equal(&other.series)
+        series.series_equal(other)
     };
     cx.env.get_boolean(b)
 }
@@ -508,35 +490,33 @@ pub fn series_equal(cx: CallContext) -> JsResult<JsBoolean> {
 #[js_function(1)]
 pub fn not(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let b = series.series.bool().map_err(JsPolarsEr::from)?;
-    let s: JsSeries = (!b).into_series().into();
-    s.try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let b = series.bool().map_err(JsPolarsEr::from)?;
+    (!b).into_series().try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn as_str(cx: CallContext) -> JsResult<JsString> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let s = format!("{:?}", series.series);
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let s = format!("{:?}", series);
     cx.env.create_string(&s)
 }
 
 #[js_function(1)]
 pub fn len(cx: CallContext) -> JsResult<JsNumber> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let len = series.series.len();
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let len = series.len();
     cx.env.create_int64(len as i64)
 }
 
 #[js_function(1)]
 pub fn quantile(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let quantile = params.get_as::<f64>("quantile")?;
     let q = series
-        .series
         .quantile_as_series(quantile, QuantileInterpolOptions::default())
         .map_err(JsPolarsEr::from)?;
     Wrap(q.get(0)).try_into_js(&cx)
@@ -545,69 +525,43 @@ pub fn quantile(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn fill_null(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let strategy = params.get_as::<String>("strategy")?;
     let strat = parse_strategy(strategy);
-    let series = series.series.fill_null(strat).map_err(JsPolarsEr::from)?;
-    JsSeries::new(series).try_into_js(&cx)
+    series
+        .fill_null(strat)
+        .map_err(JsPolarsEr::from)?
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
-pub fn map(cx: CallContext) -> JsResult<JsExternal> {
-    let params = get_params(&cx)?;
-    let series: &JsSeries = params.get_external::<JsSeries>(&cx, "_series")?;
-    let func: JsFunction = params.get("func")?;
-    let series: Series = (&series).series.clone();
-    let len = series.len();
-    let _arr = cx.env.create_array_with_length(len)?;
-
-    // for idx in 0..len {
-    //     let item: AnyValue = series.get(idx);
-    //     item
-    // }
-    let mut v: Vec<f64> = Vec::with_capacity(len);
-
-    for val in series.f64().map_err(JsPolarsEr::from)?.into_iter() {
-        println!("item = {:#?}", val);
-        let mapped = match val {
-            Some(i) => {
-                let v = i.try_into_js(&cx).expect("ok");
-                func.call(None, &[v])?
-            }
-            None => cx.env.get_undefined().map(|v| v.into_unknown())?,
-        };
-
-        match mapped.get_type()? {
-            ValueType::Number => v.push(f64::from_js(mapped)?),
-            _ => panic!("error"),
-        };
-    }
-    println!("newvec={:#?}", v);
+pub fn map(_cx: CallContext) -> JsResult<JsExternal> {
     todo!()
 }
 
 #[js_function(1)]
 pub fn zip_with(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let mask = params.get_external::<JsSeries>(&cx, "mask")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let mask = mask.series.bool().map_err(JsPolarsEr::from)?;
-    let s = series
-        .series
-        .zip_with(mask, &other.series)
-        .map_err(JsPolarsEr::from)?;
-    JsSeries::new(s).try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let mask = params.get_external::<Series>(&cx, "mask")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    let mask = mask.bool().map_err(JsPolarsEr::from)?;
+    series
+        .zip_with(mask, other)
+        .map_err(JsPolarsEr::from)?
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn str_parse_date(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let fmt = params.get_as::<Option<&str>>("fmt")?;
-    if let Ok(ca) = &series.series.utf8() {
-        let ca = ca.as_date(fmt).map_err(JsPolarsEr::from)?;
-        JsSeries::new(ca.into_series()).try_into_js(&cx)
+    if let Ok(ca) = series.utf8() {
+        ca.as_date(fmt)
+            .map_err(JsPolarsEr::from)?
+            .into_series()
+            .try_into_js(&cx)
     } else {
         Err(JsPolarsEr::Other("cannot parse Date expected utf8 type".into()).into())
     }
@@ -616,11 +570,13 @@ pub fn str_parse_date(cx: CallContext) -> JsResult<JsExternal> {
 #[js_function(1)]
 pub fn str_parse_datetime(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let fmt = params.get_as::<Option<&str>>("fmt")?;
-    if let Ok(ca) = &series.series.utf8() {
-        let ca = ca.as_datetime(fmt).map_err(JsPolarsEr::from)?;
-        JsSeries::new(ca.into_series()).try_into_js(&cx)
+    if let Ok(ca) = series.utf8() {
+        ca.as_datetime(fmt)
+            .map_err(JsPolarsEr::from)?
+            .into_series()
+            .try_into_js(&cx)
     } else {
         Err(JsPolarsEr::Other("cannot parse Date expected utf8 type".into()).into())
     }
@@ -628,29 +584,29 @@ pub fn str_parse_datetime(cx: CallContext) -> JsResult<JsExternal> {
 #[js_function(1)]
 pub fn arr_lengths(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let ca = series.series.list().map_err(JsPolarsEr::from)?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let ca = series.list().map_err(JsPolarsEr::from)?;
     let s: Series = ca.clone().into_series();
-    JsSeries::new(s).try_into_js(&cx)
+    s.try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn to_dummies(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let _series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let _series = params.get_external::<Series>(&cx, "_series")?;
     todo!()
 }
 
 #[js_function(1)]
 pub fn get_list(cx: CallContext) -> JsResult<Either<JsExternal, JsNull>> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let index = params.get_as::<usize>("index")?;
 
-    if let Ok(ca) = &series.series.list() {
+    if let Ok(ca) = series.list() {
         let s = ca.get(index);
         if let Some(item) = s {
-            JsSeries::new(item).try_into_js(&cx).map(Either::A)
+            item.try_into_js(&cx).map(Either::A)
         } else {
             cx.env.get_null().map(Either::B)
         }
@@ -667,23 +623,21 @@ pub fn shrink_to_fit(_: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn is_in(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let s: JsSeries = series
-        .series
-        .is_in(&other.series)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    series
+        .is_in(other)
         .map_err(JsPolarsEr::from)?
         .into_series()
-        .into();
-    s.try_into_js(&cx)
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn dot(cx: CallContext) -> JsResult<Either<JsNumber, JsNull>> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let dot = series.series.dot(&other.series);
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    let dot = series.dot(other);
     match dot {
         Some(d) => cx.env.create_double(d).map(Either::A),
         None => cx.env.get_null().map(Either::B),
@@ -692,14 +646,13 @@ pub fn dot(cx: CallContext) -> JsResult<Either<JsNumber, JsNull>> {
 #[js_function(1)]
 pub fn hash(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let k0 = params.get_as::<u64>("k0")?;
     let k1 = params.get_as::<u64>("k1")?;
     let k2 = params.get_as::<u64>("k2")?;
     let k3 = params.get_as::<u64>("k3")?;
     let hb = ahash::RandomState::with_seeds(k0, k1, k2, k3);
-    let s: JsSeries = series.series.hash(hb).into_series().into();
-    s.try_into_js(&cx)
+    series.hash(hb).into_series().try_into_js(&cx)
 }
 
 #[js_function(1)]
@@ -710,51 +663,47 @@ pub fn reinterpret(_: CallContext) -> JsResult<JsExternal> {
 #[js_function(1)]
 pub fn rank(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let method = params.get_as::<String>("method")?;
     let method = str_to_rankmethod(method)?;
-    let rank: JsSeries = series
-        .series
+    series
         .rank(RankOptions {
             method,
             descending: false,
         })
-        .into();
-    rank.try_into_js(&cx)
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn diff(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let n = params.get_as::<usize>("n")?;
     let null_behavior = params.get_as::<String>("null_behavior")?;
     let null_behavior = str_to_null_behavior(null_behavior)?;
-    let diff: JsSeries = series.series.diff(n, null_behavior).into();
-    diff.try_into_js(&cx)
+    series.diff(n, null_behavior).try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn cast(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let dtype: DataType = params.get_as::<JsDataType>("dtype")?.into();
     let strict = params.get_as::<bool>("strict")?;
     let out = if strict {
-        series.series.strict_cast(&dtype)
+        series.strict_cast(&dtype)
     } else {
-        series.series.cast(&dtype)
+        series.cast(&dtype)
     };
-    let out: JsSeries = out.map_err(JsPolarsEr::from)?.into();
-    out.try_into_js(&cx)
+    out.map_err(JsPolarsEr::from)?.try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn skew(cx: CallContext) -> JsResult<Either<JsNumber, JsNull>> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let bias = params.get_as::<bool>("bias")?;
-    let skew = series.series.skew(bias).map_err(JsPolarsEr::from)?;
+    let skew = series.skew(bias).map_err(JsPolarsEr::from)?;
     match skew {
         Some(skew) => cx.env.create_double(skew).map(Either::A),
         None => cx.env.get_null().map(Either::B),
@@ -763,13 +712,10 @@ pub fn skew(cx: CallContext) -> JsResult<Either<JsNumber, JsNull>> {
 #[js_function(1)]
 pub fn kurtosis(cx: CallContext) -> JsResult<Either<JsNumber, JsNull>> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let fisher = params.get_as::<bool>("fisher")?;
     let bias = params.get_as::<bool>("bias")?;
-    let kurtosis = series
-        .series
-        .kurtosis(fisher, bias)
-        .map_err(JsPolarsEr::from)?;
+    let kurtosis = series.kurtosis(fisher, bias).map_err(JsPolarsEr::from)?;
     match kurtosis {
         Some(k) => cx.env.create_double(k).map(Either::A),
         None => cx.env.get_null().map(Either::B),
@@ -779,9 +725,9 @@ pub fn kurtosis(cx: CallContext) -> JsResult<Either<JsNumber, JsNull>> {
 #[js_function(1)]
 pub fn get_str(cx: CallContext) -> JsResult<Either<JsString, JsNull>> {
     let params = get_params(&cx)?;
-    let series = params.get_external_mut::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external_mut::<Series>(&cx, "_series")?;
     let index = params.get_as::<i64>("index")?;
-    if let Ok(ca) = &series.series.utf8() {
+    if let Ok(ca) = series.utf8() {
         let index = if index < 0 {
             (ca.len() as i64 + index) as usize
         } else {
@@ -799,41 +745,40 @@ pub fn get_str(cx: CallContext) -> JsResult<Either<JsString, JsNull>> {
 #[js_function(1)]
 pub fn argsort(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let val = params.get_as::<bool>("reverse")?;
 
-    let argsort: JsSeries = series.series.argsort(val).into_series().into();
-    argsort.try_into_js(&cx)
+    series.argsort(val).into_series().try_into_js(&cx)
 }
 #[js_function(1)]
 pub fn n_chunks(cx: CallContext) -> JsResult<JsNumber> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let n = series.series.n_chunks();
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let n = series.n_chunks();
     cx.env.create_uint32(n as u32)
 }
 
 #[js_function(1)]
 pub fn null_count(cx: CallContext) -> JsResult<JsNumber> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let n = series.series.null_count();
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let n = series.null_count();
     cx.env.create_uint32(n as u32)
 }
 
 #[js_function(1)]
 pub fn has_validity(cx: CallContext) -> JsResult<JsBoolean> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let n = series.series.has_validity();
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let n = series.has_validity();
     cx.env.get_boolean(n)
 }
 #[js_function(1)]
 pub fn get_date(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let index = params.get_as::<i64>("index")?;
-    match series.series.date() {
+    match series.date() {
         Ok(ca) => {
             let index = if index < 0 {
                 (ca.len() as i64 + index) as usize
@@ -852,9 +797,9 @@ pub fn get_date(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn get_datetime(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let index = params.get_as::<i64>("index")?;
-    match series.series.datetime() {
+    match series.datetime() {
         Ok(ca) => {
             let index = if index < 0 {
                 (ca.len() as i64 + index) as usize
@@ -884,23 +829,20 @@ pub fn get_datetime(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn to_js(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let obj: JsUnknown = cx.env.to_js_value(&series.series)?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let obj: JsUnknown = cx.env.to_js_value(series)?;
     Ok(obj)
 }
 #[js_function(1)]
 pub fn rechunk(cx: CallContext) -> JsResult<Either<JsExternal, JsUndefined>> {
     let params = get_params(&cx)?;
-    let series = params.get_external_mut::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external_mut::<Series>(&cx, "_series")?;
     let in_place = params.get_as::<Option<bool>>("inPlace")?;
-    let rechunked_series = series.series.rechunk();
+    let rechunked_series = series.rechunk();
     if in_place.unwrap_or(false) {
-        series.series = rechunked_series;
         cx.env.get_undefined().map(Either::B)
     } else {
-        JsSeries::new(rechunked_series)
-            .try_into_js(&cx)
-            .map(Either::A)
+        rechunked_series.try_into_js(&cx).map(Either::A)
     }
 }
 macro_rules! init_method {
@@ -918,8 +860,7 @@ macro_rules! init_method {
                 let item = item.$getter()? as $type;
                 items.push(item)
             }
-            let s: JsSeries = Series::new(name, items).into();
-            s.try_into_js(&cx)
+            Series::new(name, items).try_into_js(&cx)
         }
     };
 }
@@ -961,8 +902,7 @@ macro_rules! init_method_opt {
             }
 
             let ca: ChunkedArray<$type> = builder.finish();
-            let s = ca.into_series();
-            JsSeries::new(s).try_into_js(&cx)
+            ca.into_series().try_into_js(&cx)
         }
     };
 }
@@ -982,9 +922,8 @@ macro_rules! impl_from_chunked {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let $name: JsSeries = series.series.$name().into_series().into();
-            $name.try_into_js(&cx)
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            series.$name().into_series().try_into_js(&cx)
         }
     };
 }
@@ -999,14 +938,12 @@ macro_rules! impl_from_chunked_with_err {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let $name: JsSeries = series
-                .series
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            series
                 .$name()
                 .map_err(JsPolarsEr::from)?
                 .into_series()
-                .into();
-            $name.try_into_js(&cx)
+                .try_into_js(&cx)
         }
     };
 }
@@ -1036,27 +973,25 @@ macro_rules! impl_method {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let s: JsSeries = series.series.$name().into();
-            s.try_into_js(&cx)
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            series.$name().try_into_js(&cx)
         }
     };
     ($name:ident, $type:ty) => {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<$type> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            series.series.$name().try_into_js(&cx)
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            series.$name().try_into_js(&cx)
         }
     };
     ($name:ident, $type:ty, $property:expr ) => {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let prop = params.get_as::<$type>($property)?;
-            let s: JsSeries = series.series.$name(prop).into();
-            s.try_into_js(&cx)
+            series.$name(prop).try_into_js(&cx)
         }
     };
 }
@@ -1081,46 +1016,41 @@ macro_rules! impl_method_with_err {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let s: JsSeries = series.series.$name().map_err(JsPolarsEr::from)?.into();
-            s.try_into_js(&cx)
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            series.$name().map_err(JsPolarsEr::from)?.try_into_js(&cx)
         }
     };
     ($name:ident, $type:ty) => {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<$type> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            series
-                .series
-                .$name()
-                .map_err(JsPolarsEr::from)?
-                .try_into_js(&cx)
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            series.$name().map_err(JsPolarsEr::from)?.try_into_js(&cx)
         }
     };
     ($name:ident, $type:ty, $property:expr ) => {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let prop = params.get_as::<$type>($property)?;
-            let s: JsSeries = series.series.$name(prop).map_err(JsPolarsEr::from)?.into();
-            s.try_into_js(&cx)
+            series
+                .$name(prop)
+                .map_err(JsPolarsEr::from)?
+                .try_into_js(&cx)
         }
     };
     ($name:ident, $type1:ty, $property1:expr , $type2:ty, $property2:expr ) => {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let prop1 = params.get_as::<$type1>($property1)?;
             let prop2 = params.get_as::<$type2>($property2)?;
-            let s: JsSeries = series
-                .series
+            series
                 .$name(prop1, prop2)
                 .map_err(JsPolarsEr::from)?
-                .into();
-            s.try_into_js(&cx)
+                .try_into_js(&cx)
         }
     };
 }
@@ -1138,27 +1068,25 @@ impl_method_with_err!(strftime, &str, "fmt");
 #[js_function(1)]
 pub(crate) fn sample_n(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let n = params.get_as::<usize>("n")?;
     let with_replacement = params.get_as::<bool>("withReplacement")?;
-    let series = series
-        .series
+    series
         .sample_n(n, with_replacement, 0)
-        .map_err(JsPolarsEr::from)?;
-    JsSeries::new(series).try_into_js(&cx)
+        .map_err(JsPolarsEr::from)?
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub(crate) fn sample_frac(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let frac = params.get_as::<f64>("frac")?;
     let with_replacement = params.get_as::<bool>("withReplacement")?;
-    let series = series
-        .series
+    series
         .sample_frac(frac, with_replacement, 0)
-        .map_err(JsPolarsEr::from)?;
-    JsSeries::new(series).try_into_js(&cx)
+        .map_err(JsPolarsEr::from)?
+        .try_into_js(&cx)
 }
 
 macro_rules! impl_equality {
@@ -1166,10 +1094,9 @@ macro_rules! impl_equality {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let rhs = params.get_external::<JsSeries>(&cx, "rhs")?;
-            let s: JsSeries = series.series.$method(&rhs.series).into_series().into();
-            s.try_into_js(&cx)
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            let rhs = params.get_external::<Series>(&cx, "rhs")?;
+            series.$method(rhs).into_series().try_into_js(&cx)
         }
     };
 }
@@ -1186,20 +1113,18 @@ macro_rules! impl_str_method {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let ca = series.series.utf8().map_err(JsPolarsEr::from)?;
-            let s = ca.$name().into_series();
-            JsSeries::new(s).try_into_js(&cx)
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            let ca = series.utf8().map_err(JsPolarsEr::from)?;
+            ca.$name().into_series().try_into_js(&cx)
         }
     };
     ($fn_name:ident, $method_name:ident) => {
         #[js_function(1)]
         pub fn $fn_name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let ca = series.series.utf8().map_err(JsPolarsEr::from)?;
-            let s = ca.$method_name().into_series();
-            JsSeries::new(s).try_into_js(&cx)
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            let ca = series.utf8().map_err(JsPolarsEr::from)?;
+            ca.$method_name().into_series().try_into_js(&cx)
         }
     };
 }
@@ -1213,40 +1138,40 @@ macro_rules! impl_str_method_with_err {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let ca = series.series.utf8().map_err(JsPolarsEr::from)?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            let ca = series.utf8().map_err(JsPolarsEr::from)?;
             let pat = params.get_as::<$type>($property)?;
-            let s = ca.$name(&pat).map_err(JsPolarsEr::from)?.into_series();
-            JsSeries::new(s).try_into_js(&cx)
+            ca.$name(&pat)
+                .map_err(JsPolarsEr::from)?
+                .into_series()
+                .try_into_js(&cx)
         }
     };
     ($fn_name:ident, $method_name:ident, $type:ty, $property:expr ) => {
         #[js_function(1)]
         pub fn $fn_name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let ca = series.series.utf8().map_err(JsPolarsEr::from)?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            let ca = series.utf8().map_err(JsPolarsEr::from)?;
             let arg = params.get_as::<$type>($property)?;
-            let s = ca
-                .$method_name(arg)
+            ca.$method_name(arg)
                 .map_err(JsPolarsEr::from)?
-                .into_series();
-            JsSeries::new(s).try_into_js(&cx)
+                .into_series()
+                .try_into_js(&cx)
         }
     };
     ($fn_name:ident, $method_name:ident,  $type1:ty, $property1:expr, $type2:ty, $property2:expr) => {
         #[js_function(1)]
         pub fn $fn_name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let ca = series.series.utf8().map_err(JsPolarsEr::from)?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            let ca = series.utf8().map_err(JsPolarsEr::from)?;
             let prop1 = params.get_as::<$type1>($property1)?;
             let prop2 = params.get_as::<$type2>($property2)?;
-            let s = ca
-                .$method_name(prop1, prop2)
+            ca.$method_name(prop1, prop2)
                 .map_err(JsPolarsEr::from)?
-                .into_series();
-            JsSeries::new(s).try_into_js(&cx)
+                .into_series()
+                .try_into_js(&cx)
         }
     };
 }
@@ -1263,7 +1188,7 @@ macro_rules! impl_rolling_method {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let window_size = params.get_as::<usize>("window_size")?;
             let weights = params.get_as::<Option<Vec<f64>>>("weights")?;
             let min_periods = params.get_as::<usize>("min_periods")?;
@@ -1274,8 +1199,10 @@ macro_rules! impl_rolling_method {
                 min_periods,
                 center,
             };
-            let s = series.series.$name(options).map_err(JsPolarsEr::from)?;
-            JsSeries::new(s).try_into_js(&cx)
+            series
+                .$name(options)
+                .map_err(JsPolarsEr::from)?
+                .try_into_js(&cx)
         }
     };
 }
@@ -1292,15 +1219,14 @@ macro_rules! impl_set_with_mask {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
-            let filter = params.get_external::<JsSeries>(&cx, "filter")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
+            let filter = params.get_external::<Series>(&cx, "filter")?;
             let value = params.get_as::<Option<$native>>("value")?;
-            let mask = filter.series.bool().map_err(JsPolarsEr::from)?;
-            let ca = &series.series.$cast().map_err(JsPolarsEr::from)?;
+            let mask = filter.bool().map_err(JsPolarsEr::from)?;
+            let ca = series.$cast().map_err(JsPolarsEr::from)?;
             let new = ca.set(mask, value).map_err(JsPolarsEr::from)?;
 
-            let series = new.into_series();
-            JsSeries::new(series).try_into_js(&cx)
+            new.into_series().try_into_js(&cx)
         }
     };
 }
@@ -1323,14 +1249,16 @@ macro_rules! impl_set_at_idx {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsUndefined> {
             let params = get_params(&cx)?;
-            let mut series = params.get_external_mut::<JsSeries>(&cx, "_series")?;
+            let series: &mut Series = params.get_external_mut::<Series>(&cx, "_series")?;
             let indices = params.get_as::<Vec<u32>>("indices")?;
             let value = params.get_as::<Option<$native>>("value")?;
-            let ca = series.series.$cast().map_err(JsPolarsEr::from)?;
-            let new = ca
+            let ca = series.$cast().map_err(JsPolarsEr::from)?;
+            let ca = ca
                 .set_at_idx(indices.iter().map(|idx| *idx as usize), value)
-                .map_err(JsPolarsEr::from)?;
-            series.series = new.into_series();
+                .map_err(JsPolarsEr::from)?
+                .into_series();
+            let old_series = std::mem::replace(series, ca);
+            std::mem::drop(old_series);
             cx.env.get_undefined()
         }
     };
@@ -1353,9 +1281,9 @@ macro_rules! impl_get {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsUnknown> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let index = params.get_as::<i64>("index")?;
-            match series.series.$series_variant() {
+            match series.$series_variant() {
                 Ok(ca) => {
                     let index = if index < 0 {
                         (ca.len() as i64 + index) as usize
@@ -1386,9 +1314,9 @@ impl_get!(get_i32, i32);
 #[js_function(1)]
 pub fn get_u64(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let index = params.get_as::<i64>("index")?;
-    match series.series.u64() {
+    match series.u64() {
         Ok(ca) => {
             let index = if index < 0 {
                 (ca.len() as i64 + index) as usize
@@ -1406,9 +1334,9 @@ pub fn get_u64(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn get_i64(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let index = params.get_as::<i64>("index")?;
-    match series.series.i64() {
+    match series.i64() {
         Ok(ca) => {
             let index = if index < 0 {
                 (ca.len() as i64 + index) as usize
@@ -1427,9 +1355,9 @@ pub fn get_i64(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn get_bool(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let index = params.get_as::<i64>("index")?;
-    match series.series.bool() {
+    match series.bool() {
         Ok(ca) => {
             let index = if index < 0 {
                 (ca.len() as i64 + index) as usize
@@ -1450,10 +1378,9 @@ macro_rules! impl_arithmetic {
     #[js_function(1)]
       pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
           let params = get_params(&cx)?;
-          let series = params.get_external::<JsSeries>(&cx, "_series")?;
+          let series = params.get_external::<Series>(&cx, "_series")?;
           let other = params.get_as::<$type>("other")?;
-          let series = (&series.series $operand other);
-          JsSeries::new(series).try_into_js(&cx)
+          (series $operand other).try_into_js(&cx)
       }
   };
 }
@@ -1514,10 +1441,9 @@ macro_rules! impl_rhs_arithmetic {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let other = params.get_as::<$type>("other")?;
-            let series = other.$operand(&series.series);
-            JsSeries::new(series).try_into_js(&cx)
+            other.$operand(series).try_into_js(&cx)
         }
     };
 }
@@ -1577,10 +1503,9 @@ macro_rules! impl_eq_num {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let rhs = params.get_as::<$type>("rhs")?;
-            let series = series.series.equal(rhs).into_series();
-            JsSeries::new(series).try_into_js(&cx)
+            series.equal(rhs).into_series().try_into_js(&cx)
         }
     };
 }
@@ -1602,10 +1527,9 @@ macro_rules! impl_neq_num {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let rhs = params.get_as::<$type>("rhs")?;
-            let series = series.series.not_equal(rhs).into_series();
-            JsSeries::new(series).try_into_js(&cx)
+            series.not_equal(rhs).into_series().try_into_js(&cx)
         }
     };
 }
@@ -1627,10 +1551,9 @@ macro_rules! impl_gt_num {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let rhs = params.get_as::<$type>("rhs")?;
-            let series = series.series.gt(rhs).into_series();
-            JsSeries::new(series).try_into_js(&cx)
+            series.gt(rhs).into_series().try_into_js(&cx)
         }
     };
 }
@@ -1652,10 +1575,9 @@ macro_rules! impl_gt_eq_num {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let rhs = params.get_as::<$type>("rhs")?;
-            let series = series.series.gt_eq(rhs).into_series();
-            JsSeries::new(series).try_into_js(&cx)
+            series.gt_eq(rhs).into_series().try_into_js(&cx)
         }
     };
 }
@@ -1677,10 +1599,9 @@ macro_rules! impl_lt_num {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let rhs = params.get_as::<$type>("rhs")?;
-            let series = series.series.lt(rhs).into_series();
-            JsSeries::new(series).try_into_js(&cx)
+            series.lt(rhs).into_series().try_into_js(&cx)
         }
     };
 }
@@ -1702,10 +1623,9 @@ macro_rules! impl_lt_eq_num {
         #[js_function(1)]
         pub fn $name(cx: CallContext) -> JsResult<JsExternal> {
             let params = get_params(&cx)?;
-            let series = params.get_external::<JsSeries>(&cx, "_series")?;
+            let series = params.get_external::<Series>(&cx, "_series")?;
             let rhs = params.get_as::<$type>("rhs")?;
-            let series = series.series.lt_eq(rhs).into_series();
-            JsSeries::new(series).try_into_js(&cx)
+            series.lt_eq(rhs).into_series().try_into_js(&cx)
         }
     };
 }
