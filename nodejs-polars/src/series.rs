@@ -47,7 +47,7 @@ pub fn new_from_typed_array(cx: CallContext) -> JsResult<JsExternal> {
     let v = buff.into_value()?;
     let mut series = from_typed_array(&v)?;
     series.rename(name);
-    JsSeries::new(series).try_into_js(&cx)
+    series.try_into_js(&cx)
 }
 
 #[js_function(1)]
@@ -55,8 +55,7 @@ pub fn new_bool(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
     let name = params.get_as::<&str>("name")?;
     let items = params.get_as::<Vec<bool>>("values")?;
-    let series: JsSeries = Series::new(name, items).into();
-    series.try_into_js(&cx)
+    Series::new(name, items).try_into_js(&cx)
 }
 
 #[js_function(1)]
@@ -82,8 +81,7 @@ pub fn new_opt_date(cx: CallContext) -> JsResult<JsExternal> {
         }
     }
     let ca: ChunkedArray<Int64Type> = builder.finish();
-    let s: JsSeries = ca.into_date().into_series().into();
-    s.try_into_js(&cx)
+    ca.into_date().into_series().try_into_js(&cx)
 }
 
 #[js_function(1)]
@@ -106,7 +104,7 @@ pub fn new_opt_bool(cx: CallContext) -> JsResult<JsExternal> {
     }
 
     let ca: ChunkedArray<BooleanType> = builder.finish();
-    JsSeries::new(ca.into_series()).try_into_js(&cx)
+    ca.into_series().try_into_js(&cx)
 }
 
 #[js_function(1)]
@@ -116,7 +114,7 @@ pub fn new_str(cx: CallContext) -> JsResult<JsExternal> {
     let val = params.get_as::<Wrap<Utf8Chunked>>("values")?;
     let mut s = val.0.into_series();
     s.rename(name);
-    JsSeries::new(s).try_into_js(&cx)
+    s.try_into_js(&cx)
 }
 
 #[js_function(1)]
@@ -125,15 +123,14 @@ pub fn new_list(cx: CallContext) -> JsResult<JsExternal> {
     let name = params.get_as::<String>("name")?;
     let values = params.get::<JsObject>("values")?;
     let dtype: DataType = params.get_as::<JsDataType>("dtype")?.into();
-    let s: JsSeries = js_arr_to_list(&name, &values, &dtype).map(|s| s.into())?;
-    s.try_into_js(&cx)
+    js_arr_to_list(&name, &values, &dtype)?.try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn new_object(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
     let series: Series = cx.env.from_js_value(&params.0)?;
-    JsSeries::new(series).try_into_js(&cx)
+    series.try_into_js(&cx)
 }
 
 #[js_function(1)]
@@ -173,14 +170,14 @@ pub fn repeat(cx: CallContext) -> JsResult<JsExternal> {
             panic!("cannot create repeat with dtype: {:?}", dt);
         }
     };
-    JsSeries::new(s).try_into_js(&cx)
+    s.try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn dtype(cx: CallContext) -> JsResult<JsString> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let dt: JsDataType = series.series.dtype().into();
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let dt: JsDataType = series.dtype().into();
     let s = dt.to_str();
     cx.env.create_string(s)
 }
@@ -188,25 +185,24 @@ pub fn dtype(cx: CallContext) -> JsResult<JsString> {
 #[js_function(1)]
 pub(crate) fn get_fmt(cx: CallContext) -> JsResult<JsString> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let s = format!("{}", &series.series);
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let s = format!("{}", series);
     cx.env.create_string(&s)
 }
 
 #[js_function(1)]
 pub fn abs(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let out = series.series.abs().map_err(JsPolarsEr::from)?;
-    JsSeries::new(out).try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    series.abs().map_err(JsPolarsEr::from)?.try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn chunk_lengths(cx: CallContext) -> JsResult<JsObject> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let mut arr = cx.env.create_array()?;
-    for (idx, chunk_len) in series.series.chunk_lengths().enumerate() {
+    for (idx, chunk_len) in series.chunk_lengths().enumerate() {
         let js_num = cx.env.create_int64(chunk_len as i64)?;
         arr.set_element(idx as u32, js_num)?;
     }
@@ -215,78 +211,71 @@ pub fn chunk_lengths(cx: CallContext) -> JsResult<JsObject> {
 #[js_function(1)]
 pub fn name(cx: CallContext) -> JsResult<JsString> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let n = series.series.name();
-    n.try_into_js(&cx)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    series.name().try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn rename(cx: CallContext) -> JsResult<JsUndefined> {
     let params = get_params(&cx)?;
-    let series = params.get_external_mut::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external_mut::<Series>(&cx, "_series")?;
     let name = params.get_as::<&str>("name")?;
-    series.series.rename(name);
+    series.rename(name);
     cx.env.get_undefined()
 }
 
 #[js_function(1)]
 pub fn get_idx(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
+    let series = params.get_external::<Series>(&cx, "_series")?;
     let idx = params.get_as::<usize>("idx")?;
-    let val: Wrap<AnyValue> = series.series.get(idx).into();
+    let val: Wrap<AnyValue> = series.get(idx).into();
     val.try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn bitand(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let out: JsSeries = series
-        .series
-        .bitand(&other.series)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    series
+        .bitand(other)
         .map_err(JsPolarsEr::from)?
-        .into();
-    out.try_into_js(&cx)
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn bitor(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let out: JsSeries = series
-        .series
-        .bitor(&other.series)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    series
+        .bitor(other)
         .map_err(JsPolarsEr::from)?
-        .into();
-    out.try_into_js(&cx)
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn bitxor(cx: CallContext) -> JsResult<JsExternal> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let other = params.get_external::<JsSeries>(&cx, "other")?;
-    let out: JsSeries = series
-        .series
-        .bitxor(&other.series)
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let other = params.get_external::<Series>(&cx, "other")?;
+    series
+        .bitxor(other)
         .map_err(JsPolarsEr::from)?
-        .into();
-    out.try_into_js(&cx)
+        .try_into_js(&cx)
 }
 
 #[js_function(1)]
 pub fn mean(cx: CallContext) -> JsResult<JsNumber> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let mean = match series.series.dtype() {
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let mean = match series.dtype() {
         DataType::Boolean => {
-            let s = series.series.cast(&DataType::UInt8).unwrap();
+            let s = series.cast(&DataType::UInt8).unwrap();
             s.mean()
         }
-        _ => series.series.mean(),
+        _ => series.mean(),
     }
     .unwrap();
     cx.env.create_double(mean)
@@ -295,18 +284,18 @@ pub fn mean(cx: CallContext) -> JsResult<JsNumber> {
 #[js_function(1)]
 pub fn max(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    match series.series.dtype() {
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    match series.dtype() {
         DataType::Float32 | DataType::Float64 => {
-            let max = series.series.max::<f64>().unwrap();
+            let max = series.max::<f64>().unwrap();
             cx.env.create_double(max).map(|v| v.into_unknown())
         }
         DataType::Boolean => {
-            let max = series.series.max::<u32>().map(|v| v == 1).unwrap();
+            let max = series.max::<u32>().map(|v| v == 1).unwrap();
             cx.env.get_boolean(max).map(|v| v.into_unknown())
         }
         _ => {
-            let max = series.series.max::<i64>().unwrap();
+            let max = series.max::<i64>().unwrap();
             cx.env.create_int64(max).map(|v| v.into_unknown())
         }
     }
@@ -315,18 +304,18 @@ pub fn max(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn min(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    match series.series.dtype() {
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    match series.dtype() {
         DataType::Float32 | DataType::Float64 => {
-            let min = series.series.min::<f64>().unwrap();
+            let min = series.min::<f64>().unwrap();
             cx.env.create_double(min).map(|v| v.into_unknown())
         }
         DataType::Boolean => {
-            let min = series.series.min::<u32>().map(|v| v == 1).unwrap();
+            let min = series.min::<u32>().map(|v| v == 1).unwrap();
             cx.env.get_boolean(min).map(|v| v.into_unknown())
         }
         _ => {
-            let min = series.series.min::<i64>().unwrap();
+            let min = series.min::<i64>().unwrap();
             cx.env.create_int64(min).map(|v| v.into_unknown())
         }
     }
@@ -335,13 +324,13 @@ pub fn min(cx: CallContext) -> JsResult<JsUnknown> {
 #[js_function(1)]
 pub fn median(cx: CallContext) -> JsResult<Either<JsNumber, JsUndefined>> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    let median = match series.series.dtype() {
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    let median = match series.dtype() {
         DataType::Boolean => {
-            let s = series.series.cast(&DataType::UInt8).unwrap();
+            let s = series.cast(&DataType::UInt8).unwrap();
             s.median()
         }
-        _ => series.series.median(),
+        _ => series.median(),
     };
     match median {
         Some(m) => Ok(Either::A(cx.env.create_double(m)?)),
@@ -352,18 +341,18 @@ pub fn median(cx: CallContext) -> JsResult<Either<JsNumber, JsUndefined>> {
 #[js_function(1)]
 pub fn sum(cx: CallContext) -> JsResult<JsUnknown> {
     let params = get_params(&cx)?;
-    let series = params.get_external::<JsSeries>(&cx, "_series")?;
-    match series.series.dtype() {
+    let series = params.get_external::<Series>(&cx, "_series")?;
+    match series.dtype() {
         DataType::Float32 | DataType::Float64 => {
-            let sum = series.series.sum::<f64>().unwrap();
+            let sum = series.sum::<f64>().unwrap();
             cx.env.create_double(sum).map(|v| v.into_unknown())
         }
         DataType::Boolean => {
-            let sum = series.series.sum::<i32>().unwrap();
+            let sum = series.sum::<i32>().unwrap();
             cx.env.create_int32(sum).map(|v| v.into_unknown())
         }
         _ => {
-            let sum = series.series.sum::<i64>().unwrap();
+            let sum = series.sum::<i64>().unwrap();
             cx.env.create_int64(sum).map(|v| v.into_unknown())
         }
     }
