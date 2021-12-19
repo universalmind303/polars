@@ -33,6 +33,11 @@ impl JsSeries {
         JsSeries { series }
     }
 }
+impl IntoJs<JsExternal> for Series {
+    fn try_into_js(self, cx: &CallContext) -> JsResult<JsExternal> {
+        cx.env.create_external(self, None)
+    }
+}
 
 #[js_function(1)]
 pub fn new_from_typed_array(cx: CallContext) -> JsResult<JsExternal> {
