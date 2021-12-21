@@ -1,11 +1,10 @@
 name: nodejs-polars-test
-
-jobs: 
-  test-js: 
-  on:
+on:
   pull_request:
     paths:
       - 'nodejs-polars/**'
+jobs: 
+  test-js: 
     runs-on: ubuntu-latest
     name: Run lint & tests
     defaults:
