@@ -1,76 +1,19 @@
-name: JS Build and test
-on:
+name: nodejs-polars-test
+
+jobs: 
+  test-js: 
+  on:
   pull_request:
     paths:
       - 'nodejs-polars/**'
-jobs: 
-  test-rust:
-    name: Build and test Rust
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install latest Rust nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2021-12-02
-          override: true
-          components: rustfmt, clippy, miri
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          # these represent dependencies downloaded by cargo
-          # and thus do not depend on the OS, arch nor rust version.
-          path: /github/home/.cargo
-          key: cargo-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v2
-        with:
-          # these represent compiled steps of both dependencies and arrow
-          # and thus are specific for a particular OS, arch and rust version.
-          path: /github/home/target
-          key: ubuntu-x86-64-target-cache-nightly
-      - name: Install dependencies
-        run: |
-          cargo install cargo-hack
-          curl -fsSLO https://github.com/dprint/dprint/releases/download/0.18.2/dprint-x86_64-unknown-linux-gnu.zip
-          unzip -o dprint-x86_64-unknown-linux-gnu.zip dprint -d ~/.cargo/bin/
-          rm -f dprint-x86_64-unknown-linux-gnu.zip
-      - name: Run formatting checks
-        run: |
-          cargo fmt --all -- --check
-          dprint check
-      - name: Run linting checks
-        run : |
-          # do not produce debug symbols to keep memory usage down
-          export RUSTFLAGS="-C debuginfo=0"
-          cd polars && cargo clippy -Z unstable-options --all-features \
-          -p polars-core \
-          -p polars-io \
-          -p polars-lazy \
-          -- -D warnings
-          cargo clippy -Z unstable-options -- -D warnings
-      - name: Feature test
-        run: |
-          cd polars && cargo hack check --each-feature --no-dev-deps --features private
-      - name: Run tests
-        run: |
-          export RUSTFLAGS="-C debuginfo=0"
-          cd polars && make test
-      - name: Run miri
-        run: |
-          cd polars
-          cargo miri setup
-          cargo clean
-          make miri
-  test-js: 
-    runs-on: ubuntu-latest
-    name: Build and test JS
+    name: Run lint & tests
     defaults:
       run:
         working-directory: nodejs-polars
     strategy:
       matrix:
-        js-version: [ "14", "16", "17" ]
+        js-version: ["16", "17"]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
@@ -90,3 +33,5 @@ jobs:
         run: yarn lint:ts
       - name: Run Tests
         run: yarn test
+      - name: Build JS
+        run: yarn build:ts
