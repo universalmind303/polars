@@ -443,7 +443,6 @@ pub fn arr_to_list(obj: &JsObject, dtype: DataType) -> JsResult<Series> {
         DataType::Float64 => arr_to_series!(len, obj, f64),
         DataType::Utf8 => arr_to_series!(len, obj, &str),
         DataType::Boolean => arr_to_series!(len, obj, bool),
-        // cast other values to int32
         _ => arr_to_series!(len, obj, i32),
     };
     Ok(s)
