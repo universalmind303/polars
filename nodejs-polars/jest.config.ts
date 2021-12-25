@@ -11,6 +11,7 @@ export default {
   testEnvironment: "node",
   clearMocks: true,
   collectCoverage: true,
+  coverageReporters: ["json", "text", "text-summary"],
   moduleDirectories: ["node_modules", "./polars"],
   moduleFileExtensions: ["js", "ts"],
   setupFilesAfterEnv : ["<rootDir>/__tests__/setup.ts"],

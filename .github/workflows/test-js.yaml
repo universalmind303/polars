@@ -39,3 +39,12 @@ jobs:
         run: yarn build:ts
       - name: Import polars 
         run: yarn node -e "require('nodejs-polars')"
+  coverage: 
+    steps:
+      - uses: actions/checkout@v1
+      - uses: ArtiomTr/jest-coverage-report-action@v2.0-rc.6
+        with:
+          working-directory: nodejs-polars
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          coverage-file: ./coverage/report-final.json
+          package-manager: yarn
