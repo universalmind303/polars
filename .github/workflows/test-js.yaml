@@ -39,13 +39,8 @@ jobs:
         run: yarn build:ts
       - name: Import polars 
         run: yarn node -e "require('nodejs-polars')"
-  coverage: 
-    runs-on: ubuntu-latest
-    needs:
-      - test-js
-    steps:
-      - uses: actions/checkout@v1
-      - uses: ArtiomTr/jest-coverage-report-action@v2.0-rc.6
+      - name: Report Coverage
+        uses: ArtiomTr/jest-coverage-report-action@v2.0-rc.6
         with:
           working-directory: nodejs-polars
           github-token: ${{ secrets.GITHUB_TOKEN }}
