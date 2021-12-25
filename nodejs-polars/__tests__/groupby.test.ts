@@ -11,7 +11,6 @@ describe("groupby", () => {
   });
 
   test("aggList", () => {
-    const s = pl.Series("a", [1], pl.Int16);
     const actual = df
       .groupBy("name")
       .aggList()

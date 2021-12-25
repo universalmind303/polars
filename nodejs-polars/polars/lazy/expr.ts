@@ -992,7 +992,6 @@ const ExprStringFunctions = (_expr: JsExpr): ExprStringFunctions => {
 const _Expr = (_expr: JsExpr): Expr => {
 
   const wrap = (method, args?): Expr => {
-
     return Expr(pli.expr[method]({_expr, ...args }));
   };
   const wrapNullArgs = (method: string) => () => wrap(method);
@@ -1028,8 +1027,9 @@ const _Expr = (_expr: JsExpr): Expr => {
 
     return f;
   };
-  const exclude = (column, ...columns) => {
-    return wrap("exclude", {columns: [column, ...columns]});
+  const exclude = (...columns) => {
+
+    return wrap("exclude", {columns: columns.flat(2)});
   };
   const fillNull = (fillValue) => {
     if(["backward", "forward", "mean", "min", "max", "zero", "one"].includes(fillValue)) {

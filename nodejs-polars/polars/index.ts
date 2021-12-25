@@ -56,12 +56,12 @@ namespace pl {
   export import readJSON = io.readJSON;
 
   // lazy
-  export import col = lazy.col
-  export import cols = lazy.cols
-  export import lit = lazy.lit
+  export import all = lazy.all
   export import arange = lazy.arange
   export import argSortBy = lazy.argSortBy
   export import avg = lazy.avg
+  export import col = lazy.col
+  export import cols = lazy.cols
   export import concatList = lazy.concatList
   export import concatString = lazy.concatString
   export import count = lazy.count
@@ -72,6 +72,8 @@ namespace pl {
   export import groups = lazy.groups
   export import head = lazy.head
   export import last = lazy.last
+  export import list = lazy.list
+  export import lit = lazy.lit
   export import mean = lazy.mean
   export import median = lazy.median
   export import nUnique = lazy.nUnique
@@ -80,7 +82,6 @@ namespace pl {
   export import select = lazy.select
   export import spearmanRankCorr = lazy.spearmanRankCorr
   export import tail = lazy.tail
-  export import list = lazy.list
   export import when = _when.when;
   export const version = _version;
 }
