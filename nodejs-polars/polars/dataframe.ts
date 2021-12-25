@@ -4,7 +4,6 @@ import {GroupBy} from "./groupby";
 import {LazyDataFrame} from "./lazy/dataframe";
 import {concat} from "./functions";
 import {Expr} from "./lazy/expr";
-import {todo} from "./error";
 import {Series, seriesWrapper} from "./series";
 import {Stream} from "stream";
 import {isExternal} from "util/types";
@@ -20,7 +19,6 @@ import {
   columnOrColumns,
   columnOrColumnsStrict,
   ColumnSelection,
-  DownsampleRule,
   FillNullStrategy,
   isSeriesArray,
   ColumnsOrExpr,
@@ -43,8 +41,6 @@ export interface DataFrame {
   columns: string[]
   [inspect](): string;
   [Symbol.iterator](): Generator<any, void, any>;
-  inner(): JsDataFrame
-
   /**
    * Very cheap deep clone.
    */
@@ -507,8 +503,6 @@ export interface DataFrame {
    * @see {@link head}
    */
   limit(length?: number): DataFrame
-  map<T>(func: (...args: any[]) => T): T[]
-
   /**
    * Aggregate the columns of this DataFrame to their maximum value.
    * ___
@@ -1130,10 +1124,6 @@ function prepareOtherArg<T>(anyValue: T | Series<T>): Series<T> {
     return Series([anyValue]) as Series<T>;
   }
 }
-function map<T>(df: DataFrame, fn: (...args: any[]) => T[]) {
-
-  return df.rows().map(fn);
-}
 
 export const dfWrapper = (_df: JsDataFrame): DataFrame => {
   const unwrap = <U>(method: string, args?: object, df=_df): U => {
@@ -1178,7 +1168,6 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
     get columns() {
       return unwrap<string[]>("columns");
     },
-    inner: () => _df,
     clone: noArgWrap("clone"),
     describe() {
       const describeCast = (df: DataFrame) => {
@@ -1208,7 +1197,6 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
 
       return summary;
     },
-    downsample: (opt, rule?, n?) => GroupBy( _df, opt?.by ?? opt, true, opt?.rule ?? rule, opt?.n ?? n),
     drop(name, ...names) {
       names.unshift(name);
       if(!Array.isArray(names[0]) && names.length === 1) {
@@ -1483,11 +1471,13 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
         const columns = this.columns;
         const rows = this.rows();
 
-        return rows.map(row => {
-          return row.reduce((acc, curr, currIdx) => ({
-            [columns[currIdx]]: curr,
-            ...acc
-          }));
+        return rows.map((row) => {
+          const rowObj = {};
+          row.forEach((v, idx) => {
+            rowObj[columns[idx]] = v;
+          });
+
+          return rowObj;
         });
       }
       if(options?.orient === "literal") {
@@ -1503,12 +1493,14 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
         };
       }, {});
     },
-    toJSON(arg0?, options?): any {
+    toJSON(arg0?): any {
 
+      // used for JSON.stringify(df)
       if(arg0 === "") {
-        return this.toJS({orient: "literal", ...options});
+        return this.toJS({orient: "literal"});
       }
 
+      // df.toJSON()
       return this.__toJSON(arg0);
     },
     __toJSON(dest?): any  {
@@ -1545,7 +1537,6 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
     multiplyBy: (other) =>  wrap("mul", {other: prepareOtherArg(other)._series}),
     modulo: (other) =>  wrap("rem", {other: prepareOtherArg(other)._series}),
     var: noArgWrap("var"),
-    map: (fn) => map(dfWrapper(_df), fn as any) as any,
     row: (index) => unwrap("to_row", {idx: index}),
     vstack: (other) => wrap("vstack", {other: other._df}),
     withColumn(column: Series<any> | Expr) {
@@ -1594,7 +1585,7 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
         return Reflect.get(target, prop, receiver);
       }
     },
-    set(target: DataFrame, prop, receiver) {
+    set(target: DataFrame, prop, receiver): any {
       if(Series.isSeries(receiver)) {
         if(typeof prop === "string" && target.columns.includes(prop)) {
           const idx = target.columns.indexOf(prop);
@@ -1602,16 +1593,9 @@ export const dfWrapper = (_df: JsDataFrame): DataFrame => {
 
           return true;
         }
-        if(typeof prop !== "symbol" && !Number.isNaN(Number(prop))) {
-          target.replaceAtIdx(Number(prop), receiver);
-
-          return true;
-        }
       }
+      throw new TypeError(`'df[${String(prop)}] = ${receiver}' is not a supported operation`);
 
-      Reflect.set(target, prop, receiver);
-
-      return true;
     },
     has(target, p) {
       return target.columns.includes(p as any);

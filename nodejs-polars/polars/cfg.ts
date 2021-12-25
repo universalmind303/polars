@@ -9,15 +9,18 @@ export interface Config {
   setTblRows(n: number): Config
   /** Set the number of columns used to print tables */
   setTblCols(n: number): Config
+
+  // TODO!
+
   /** Turn on the global string cache */
-  setGlobalStringCache(): Config
+  // setGlobalStringCache(): Config
   /** Turn off the global string cache */
-  unsetGlobalStringCache(): Config
+  // unsetGlobalStringCache(): Config
 }
 export const Config = (): Config => {
   return {
     setUtf8Tables() {
-      process.env["POLARS_FMT_NO_UTF8"] = undefined;
+      delete process.env["POLARS_FMT_NO_UTF8"];
 
       return this;
     },
@@ -40,13 +43,6 @@ export const Config = (): Config => {
       process.env["POLARS_FMT_MAX_COLS"] = String(n);
 
       return this;
-    },
-    setGlobalStringCache() {
-      return this;
-    },
-    unsetGlobalStringCache() {
-      return this;
     }
-
   };
 };

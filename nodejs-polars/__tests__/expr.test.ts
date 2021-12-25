@@ -833,28 +833,7 @@ describe("expr", () => {
     );
     expect(actual).toFrameStrictEqual(expected);
   });
-  test("shift", () => {
-    const df = pl.DataFrame({"a": [1, 2, 3, 4]});
-    const expected = pl.DataFrame({
-      "a": [1, 2, 3, 4],
-      "one": [null, 1, 2, 3],
-      "negative_one": [2, 3, 4, null],
-      "two": [null, null, 1, 2],
-    });
-    const shifts = pl.DataFrame({
-      "name": ["one", "negative_one", "two"],
-      "values": [1, -1, 2]
-    })
-      .map(([name, value]) => col("a")
-        .shift(value)
-        .as(name)
-      );
-    const actual  = df.select(
-      col("a"),
-      ...shifts
-    );
-    expect(actual).toFrameStrictEqual(expected);
-  });
+
   test("shiftAndFill", () => {
     const df = pl.DataFrame({"a": [1, 2, 3, 4]});
     const expected = pl.DataFrame({

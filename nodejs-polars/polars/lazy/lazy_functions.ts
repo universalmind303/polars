@@ -453,7 +453,9 @@ export function list(column: ExprOrString): Expr {
 
 
 // export function collect_all() {}
-// export function all() {} // fold
+export function all() {
+  return col("*");
+} // fold
 // export function any() {} // fold
 // export function apply() {} // lambda
 // export function fold() {}

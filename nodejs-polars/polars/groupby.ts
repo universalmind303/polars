@@ -8,7 +8,7 @@ import {InvalidOperationError, todo} from "./error";
 import {Expr} from "./lazy/expr";
 
 
-import {col} from "./lazy/lazy_functions";
+import {col, all} from "./lazy/lazy_functions";
 
 const inspectOpts = {colors:true, depth:null};
 
@@ -30,7 +30,7 @@ export interface GroupBy {
    * @param columns - map of 'col' -> 'agg'
    *
    *  - using lazy API (recommended): `[col('foo').sum(), col('bar').min()]`
-   *  - using multiple aggs per column: `{'foo': ['sum', 'numUnique'], 'bar': ['min'] }`
+   *  - using multiple aggs per column: `{'foo': ['sum', 'nUnique'], 'bar': ['min'] }`
    *  - using single agg per column:  `{'foo': ['sum'], 'bar': 'min' }`
    * @example
    * ```
@@ -144,7 +144,7 @@ export interface GroupBy {
   /**
    * Count the unique values per group.
    */
-  numUnique(): DataFrame
+  nUnique(): DataFrame
   /**
    * Do a pivot operation based on the group key, a pivot column and an aggregation function on the values column.
    * @param pivotCol - Column to pivot.
@@ -176,7 +176,7 @@ export type GroupBySelection = Pick<GroupBy,
   | "mean"
   | "median"
   | "min"
-  | "numUnique"
+  | "nUnique"
   | "quantile"
   | "sum"
 > & {[inspect](): string}
@@ -264,22 +264,22 @@ export function GroupBy(
   return Object.seal(
     Object.assign(
       select, {
-        aggList: selectAll().aggList,
+        aggList: () => agg(all().list()),
         agg,
-        count: selectAll().count,
-        first: selectAll().first,
+        count: () => agg(all().count()),
+        first: () => agg(all().first()),
         groups: () => _wrapDataFrame(df, "groupby", {by, agg: "groups"}),
-        head: (n=5) => {throw todo();},
-        last: selectAll().last,
-        max: selectAll().max,
-        mean: selectAll().mean,
-        median: selectAll().median,
-        min: selectAll().min,
-        numUnique: selectAll().numUnique,
+        head: (n=5) => agg(all().head(n)),
+        last: () => agg(all().last()),
+        max: () => agg(all().max()),
+        mean: () => agg(all().mean()),
+        median: () => agg(all().median()),
+        min: () => agg(all().min()),
+        nUnique: () => agg(all().nUnique()),
         pivot,
-        quantile: selectAll().quantile,
-        sum: selectAll().sum,
-        tail: (n=5) => {throw todo();},
+        quantile: (q: number) =>  agg(all().nUnique()),
+        sum: () => agg(all().sum()),
+        tail: (n=5) => agg(all().tail(n)),
         [Symbol.isConcatSpreadable]: true,
         toString: () => "GroupBy",
         [inspect]: customInspect
@@ -326,7 +326,7 @@ function GroupBySelection(
     mean: wrapCall("mean"),
     median: wrapCall("median"),
     min: wrapCall("min"),
-    numUnique: wrapCall("n_unique"),
+    nUnique: wrapCall("n_unique"),
     quantile,
     sum: wrapCall("sum"),
 
