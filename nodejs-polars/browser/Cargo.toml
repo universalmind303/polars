@@ -1,0 +1,40 @@
+[package]
+name = "polars"
+version = "0.0.1"
+authors = ["Ritchie Vink"]
+documentation = "https://pola-rs.github.io/polars-book/"
+edition = "2021"
+homepage = "https://github.com/pola-rs/polars"
+license = "MIT"
+repository = "https://github.com/pola-rs/polars"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+
+[features]
+
+[dependencies]
+wasm-bindgen = "0.2.78"
+js-sys = "0.3.55"
+wee_alloc = { version = "0.4.2", optional = true }
+thiserror = "1.0.20"
+
+[dependencies.web-sys]
+version = "0.3.55"
+features = ["console"]
+
+[target."cfg(debug_assertions)".dependencies]
+console_error_panic_hook = "0.1.5"
+
+[dependencies.polars-core]
+path = "../../polars/polars-core"
+features = [
+  "strings",
+  "temporal",
+  "performant",
+]
+
+[workspace]
