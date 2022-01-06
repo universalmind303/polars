@@ -1011,8 +1011,11 @@ export interface Series<T> extends
 /** @ignore */
 export const seriesWrapper = <T>(_s: JsSeries): Series<T> => {
   const unwrap = <U>(method: string, args?: object, _series = _s): U => {
-
-    return pli.series[method]({_series, ...args});
+    try {
+      return pli.series[method]({_series, ...args });
+    } catch {
+      return _series[method]({_series, ...args });
+    }
   };
   const wrap = <U>(method, args?, _series = _s): Series<U> => {
     return seriesWrapper(unwrap(method, args, _series));
