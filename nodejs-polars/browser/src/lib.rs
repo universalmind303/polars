@@ -2,6 +2,7 @@ mod series;
 mod error;
 mod conversion;
 use wasm_bindgen::prelude::*;
+mod prelude;
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
 // allocator.

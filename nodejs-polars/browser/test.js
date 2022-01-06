@@ -1,3 +1,4 @@
 const pl = require("./pkg/polars")
 
-console.log(pl.JsSeries.new_bool({name: "foo", values:[true]}))
+console.log(pl)
+console.log(pl.series.new_str({name: "foo", values:["aaaa"]}).toString())
