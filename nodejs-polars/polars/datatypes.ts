@@ -112,10 +112,12 @@ const POLARS_TYPE_TO_CONSTRUCTOR: Record<string, string> = {
 };
 
 export const polarsTypeToConstructor = (dtype: DataType): CallableFunction => {
+
   const constructor = POLARS_TYPE_TO_CONSTRUCTOR[DataType[dtype]];
   if (!constructor) {
     throw new Error(`Cannot construct Series for type ${DataType[dtype]}.`);
   }
+  console.log({constructor});
 
   return pli.series[constructor];
 };

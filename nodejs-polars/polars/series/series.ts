@@ -1014,6 +1014,8 @@ export const seriesWrapper = <T>(_s: JsSeries): Series<T> => {
     try {
       return pli.series[method]({_series, ...args });
     } catch {
+      console.log({method, args});
+
       return _series[method]({_series, ...args });
     }
   };
@@ -1642,7 +1644,10 @@ function SeriesConstructor (arg0: any, arg1?: any, dtype?: any, strict?: any) {
   return SeriesConstructor("", arg0);
 }
 
-const isSeries = <T>(anyVal: any): anyVal is Series<T> => isExternal(anyVal?._series);
+const isSeries = <T>(anyVal: any): anyVal is Series<T> => {
+  return isExternal(anyVal?._series) ||
+  typeof anyVal?._series?.ptr === "number";
+};
 
 const from = <T>(values: ArrayLike<T>): Series<T> => {
   if(isTypedArray(values)) {

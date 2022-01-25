@@ -114,12 +114,12 @@ export function arrayToJsSeries(name: string, values: any[], dtype?: any, strict
     const constructor = polarsTypeToConstructor(dtype);
     series = constructor({ name, values, strict });
   }
-  if ([DataType.Datetime, DataType.Date].includes(dtype)) {
-    series = pli.series.cast({ _series: series, dtype, strict: false });
-  }
-  if(dtype === DataType.Categorical) {
-    series = pli.series.cast({ _series: series, dtype, strict: false });
-  }
+  // if ([DataType.Datetime, DataType.Date].includes(dtype)) {
+  //   series = pli.series.cast({ _series: series, dtype, strict: false });
+  // }
+  // if(dtype === DataType.Categorical) {
+  //   series = pli.series.cast({ _series: series, dtype, strict: false });
+  // }
 
   return series;
 }

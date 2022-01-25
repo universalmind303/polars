@@ -2,6 +2,7 @@ use crate::error::*;
 
 use crate::prelude::*;
 use crate::{console_log, log};
+use wasm_bindgen::JsCast;
 type JsResult<T> = std::result::Result<T, JsValue>;
 
 pub trait FromJsValue: Sized + Send {

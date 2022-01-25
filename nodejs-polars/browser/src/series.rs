@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use polars::prelude::*;
 use polars_core::utils::CustomIterTools;
+use wasm_bindgen::JsCast;
+
 #[wasm_bindgen(js_name=series)]
 #[repr(transparent)]
 pub struct JsSeries {
@@ -22,15 +24,133 @@ impl JsSeries {
         let values = params.get_as::<Vec<bool>>("values")?;
         Ok(Series::new(&name, values).into())
     }
+    #[wasm_bindgen]
+    pub fn new_opt_bool(params: JsValue) -> JsResult<JsSeries> {
+        let params = WrappedObject(params);
+        let name = params.get_as::<String>("name")?;
+        let strict = params.get_as::<bool>("strict")?;
+        let arr: js_sys::Array = params.get("values")?.into();
+        let len = arr.length();
+        let mut builder = BooleanChunkedBuilder::new(&name, len as usize);
+        for i in 0..len {
+            let item: JsValue = arr.get(i);
+
+            match item.as_bool() {
+                Some(b) => builder.append_value(b),
+                None => {
+                    if strict {
+                        return Err("".into());
+                    }
+                    builder.append_null()
+                }
+            }
+        }
+        let ca: BooleanChunked = builder.finish();
+        Ok(ca.into_series().into())
+    }
 
     #[wasm_bindgen]
     pub fn new_str(params: JsValue) -> JsResult<JsSeries> {
         let params = WrappedObject(params);
         let name = params.get_as::<String>("name")?;
-        let val = params.get_as::<Utf8Chunked>("values")?;
-        let mut s = val.into_series();
-        s.rename(&name);
-        Ok(s.into())
+        let values = params.get_as::<Vec<String>>("values")?;
+        Ok(Series::new(&name, values).into())
+    }
+
+    #[wasm_bindgen]
+    pub fn new_opt_str(params: JsValue) -> JsResult<JsSeries> {
+        let params = WrappedObject(params);
+        let name = params.get_as::<String>("name")?;
+        let strict = params.get_as::<bool>("strict")?;
+        let arr: js_sys::Array = params.get("values")?.into();
+        let len = arr.length();
+        let u_len = len as usize;
+        let mut builder = Utf8ChunkedBuilder::new("", u_len, u_len * 25);
+        for i in 0..len {
+            let item: JsValue = arr.get(i);
+
+            match item.as_string() {
+                Some(b) => builder.append_value(b),
+                None => {
+                    if strict {
+                        return Err("".into());
+                    }
+                    builder.append_null()
+                }
+            }
+        }
+        let ca: Happy_li = builder.finish();
+        Ok(ca.into_series().into())
+    }
+
+    #[wasm_bindgen]
+    pub fn new_u64(params: JsValue) -> JsResult<JsSeries> {
+        let params = WrappedObject(params);
+        let name = params.get_as::<String>("name")?;
+        let values = params.get_as::<Vec<String>>("values")?;
+        Ok(Series::new(&name, values).into())
+    }
+
+    #[wasm_bindgen]
+    pub fn new_opt_u64(params: JsValue) -> JsResult<JsSeries> {
+        let params = WrappedObject(params);
+        let name = params.get_as::<String>("name")?;
+        let strict = params.get_as::<bool>("strict")?;
+        let arr: js_sys::Array = params.get("values")?.into();
+        let len = arr.length();
+        let u_len = len as usize;
+        let mut builder = PrimitiveChunkedBuilder::<UInt64Type>::new(&name, u_len);
+        for i in 0..len {
+            let item: JsValue = arr.get(i);
+            if item.is_bigint() {
+                let bigint = item.as_string().unwrap().parse::<u64>().unwrap();
+
+                builder.append_value(bigint)
+            } else {
+                if strict {
+                    return Err("".into());
+                }
+                builder.append_null()
+            }
+        }
+        let ca: ChunkedArray<UInt64Type> = builder.finish();
+        Ok(ca.into_series().into())
+    }
+    #[wasm_bindgen]
+    pub fn new_date(params: JsValue) -> JsResult<JsSeries> {
+        let params = WrappedObject(params);
+        let name = params.get_as::<String>("name")?;
+        let values = params.get_as::<Vec<String>>("values")?;
+        Ok(Series::new(&name, values).into())
+    }
+
+    #[wasm_bindgen]
+    pub fn new_opt_date(params: JsValue) -> JsResult<JsSeries> {
+        let params = WrappedObject(params);
+        let name = params.get_as::<String>("name")?;
+        let strict = params.get_as::<bool>("strict")?;
+        let arr: js_sys::Array = params.get("values")?.into();
+        let len = arr.length();
+        let mut builder = PrimitiveChunkedBuilder::<Int64Type>::new(&name, len as usize);
+        for i in 0..len {
+            let item: JsValue = arr.get(i);
+            if js_sys::Date::instanceof(&item) {
+                let d: js_sys::Date = item.unchecked_into();
+                let millis = d.get_milliseconds();
+
+                builder.append_value(millis as i64)
+            } else {
+                if strict {
+                    return Err("".into());
+                }
+                builder.append_null()
+            }
+        }
+        let ca: ChunkedArray<Int64Type> = builder.finish();
+        Ok(ca
+            .into_datetime(TimeUnit::Milliseconds, None)
+            .into_series()
+            .into())
     }
 
     #[wasm_bindgen]
@@ -42,14 +162,29 @@ impl JsSeries {
         let dt: JsDataType = self.series.dtype().into();
         dt.to_string()
     }
+
     pub fn name(&self) -> String {
         self.series.name().into()
     }
+
     pub fn rename(&mut self, params: JsValue) -> JsResult<(())> {
         let params = WrappedObject(params);
         let name = params.get_as::<String>("name")?;
         self.series.rename(&name);
         Ok(())
+    }
+
+    pub fn cast(&mut self, params: JsValue) -> JsResult<JsSeries> {
+        let params = WrappedObject(params);
+        let dtype = params.get_as::<DataType>("dtype")?;
+        let strict = params.get_as::<bool>("strict")?;
+        let out = if strict {
+            self.series.strict_cast(&dtype)
+        } else {
+            self.series.cast(&dtype)
+        };
+        let s = out.map_err(JsPolarsEr::from)?;
+        Ok(s.into())
     }
 }
 
@@ -86,7 +221,7 @@ macro_rules! init_method_opt {
 }
 init_method_opt!(new_opt_u16, UInt16Type, u16);
 init_method_opt!(new_opt_u32, UInt32Type, u32);
-init_method_opt!(new_opt_u64, UInt64Type, u64);
+// init_method_opt!(new_opt_u64, UInt64Type, u64);
 init_method_opt!(new_opt_i8, Int8Type, i8);
 init_method_opt!(new_opt_i16, Int16Type, i16);
 init_method_opt!(new_opt_i32, Int32Type, i32);
@@ -241,4 +376,4 @@ macro_rules! impl_equality {
     };
 }
 
-impl_equality!(eq, equal);
+// impl_equality!(eq, equal);

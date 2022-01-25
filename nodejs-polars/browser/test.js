@@ -1,4 +1,4 @@
-const pl = require("./pkg/polars")
+const pl = require("../bin/index.js")
 
-console.log(pl)
-console.log(pl.series.new_str({name: "foo", values:["aaaa"]}).toString())
+
+console.log(pl.Series(["","2","$"]))
