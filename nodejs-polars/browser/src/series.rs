@@ -15,8 +15,39 @@ impl From<Series> for JsSeries {
     }
 }
 
+macro_rules! typed_to_series {
+    ($series_name:expr, $arr:expr,$pl_type:ty) => {{
+        let s = ChunkedArray::<$pl_type>::new_from_aligned_vec(&$series_name, $arr.to_vec())
+            .into_series();
+        JsSeries::from(s)
+    }};
+}
 #[wasm_bindgen(js_class=series)]
 impl JsSeries {
+    #[wasm_bindgen]
+    pub fn new_from_typed_array(params: JsValue) -> JsResult<JsSeries> {
+        let params = WrappedObject(params);
+        let name = params.get_as::<String>("name")?;
+        let values: TypedArrayType = params.get("values")?.into();
+        let series = match values {
+            TypedArrayType::Int8(v) => typed_to_series!(&name, v, Int8Type),
+            TypedArrayType::Uint8(v) => typed_to_series!(&name, v, UInt8Type),
+            TypedArrayType::Uint8Clamped(v) => typed_to_series!(&name, v, UInt8Type),
+            TypedArrayType::Int16(v) => typed_to_series!(&name, v, Int16Type),
+            TypedArrayType::Uint16(v) => typed_to_series!(&name, v, UInt16Type),
+            TypedArrayType::Int32(v) => typed_to_series!(&name, v, Int32Type),
+            TypedArrayType::Uint32(v) => typed_to_series!(&name, v, UInt32Type),
+            TypedArrayType::Float32(v) => typed_to_series!(&name, v, Float32Type),
+            TypedArrayType::Float64(v) => typed_to_series!(&name, v, Float64Type),
+            // TypedArrayType::BigInt64(v) => typed_to_series!(&name, v, Int64Type),
+            // TypedArrayType::BigUint64(v) => typed_to_series!(&name, v, UInt64Type),
+        };
+        Ok(series)
+        // let v = buff.into_value()?;
+        // let mut series = from_typed_array(&v)?;
+        // series.rename(name);
+        // series.try_into_js(&cx)
+    }
     #[wasm_bindgen]
     pub fn new_bool(params: JsValue) -> JsResult<JsSeries> {
         let params = WrappedObject(params);
@@ -79,7 +110,7 @@ impl JsSeries {
                 }
             }
         }
-        let ca: Happy_li = builder.finish();
+        let ca: Utf8Chunked = builder.finish();
         Ok(ca.into_series().into())
     }
 
@@ -167,6 +198,10 @@ impl JsSeries {
         self.series.name().into()
     }
 
+    pub fn len(&self) -> JsValue {
+        self.series.len().into()
+    }
+
     pub fn rename(&mut self, params: JsValue) -> JsResult<(())> {
         let params = WrappedObject(params);
         let name = params.get_as::<String>("name")?;
@@ -185,6 +220,9 @@ impl JsSeries {
         };
         let s = out.map_err(JsPolarsEr::from)?;
         Ok(s.into())
+    }
+    pub fn to_js(&self) -> JsValue {
+        JsValue::from_serde(&self.series).unwrap()
     }
 }
 
@@ -376,4 +414,39 @@ macro_rules! impl_equality {
     };
 }
 
+macro_rules! impl_get {
+    ($name:ident, $series_variant:ident) => {
+        #[wasm_bindgen(js_class=series)]
+        impl JsSeries {
+            #[wasm_bindgen]
+            pub fn $name(&self, params: JsValue) -> JsResult<JsValue> {
+                let params = WrappedObject(params);
+                let index = params.get_as::<i64>("index")?;
+                match self.series.$series_variant() {
+                    Ok(ca) => {
+                        let index = if index < 0 {
+                            (ca.len() as i64 + index) as usize
+                        } else {
+                            index as usize
+                        };
+                        match ca.get(index) {
+                            Some(v) => Ok(v.into()),
+                            None => Ok(JsValue::NULL),
+                        }
+                    }
+                    Err(_) => Ok(JsValue::NULL),
+                }
+            }
+        }
+    };
+}
+
+impl_get!(get_f32, f32);
+impl_get!(get_f64, f64);
+impl_get!(get_u8, u8);
+impl_get!(get_u16, u16);
+impl_get!(get_u32, u32);
+impl_get!(get_i8, i8);
+impl_get!(get_i16, i16);
+impl_get!(get_i32, i32);
 // impl_equality!(eq, equal);

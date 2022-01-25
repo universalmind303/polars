@@ -99,3 +99,61 @@ impl From<&DataType> for JsDataType {
     }
   }
 }
+
+
+pub enum TypedArrayType {
+  Int8(js_sys::Int8Array),
+  Uint8(js_sys::Uint8Array),
+  Uint8Clamped(js_sys::Uint8ClampedArray),
+  Int16(js_sys::Int16Array),
+  Uint16(js_sys::Uint16Array),
+  Int32(js_sys::Int32Array),
+  Uint32(js_sys::Uint32Array),
+  Float32(js_sys::Float32Array),
+  Float64(js_sys::Float64Array),
+  // BigInt64(js_sys::BigInt64Array),
+  // BigUint64(js_sys::BigUint64Array),
+}
+
+impl From<wasm_bindgen::JsValue> for TypedArrayType {
+  fn from(v: wasm_bindgen::JsValue) -> Self {
+    use wasm_bindgen::JsCast;
+
+    if js_sys::Int8Array::instanceof(&v) {
+      TypedArrayType::Int8(v.into())
+    } 
+    else if js_sys::Uint8Array::instanceof(&v) {
+      TypedArrayType::Uint8(v.into())
+    }
+    else if js_sys::Uint8ClampedArray::instanceof(&v) {
+      TypedArrayType::Uint8Clamped(v.into())
+    }
+    else if js_sys::Int16Array::instanceof(&v) {
+      TypedArrayType::Int16(v.into())
+    }
+    else if js_sys::Uint16Array::instanceof(&v) {
+      TypedArrayType::Uint16(v.into())
+    }
+    else if js_sys::Int32Array::instanceof(&v) {
+      TypedArrayType::Int32(v.into())
+    }
+    else if js_sys::Uint32Array::instanceof(&v) {
+      TypedArrayType::Uint32(v.into())
+    }
+    else if js_sys::Float32Array::instanceof(&v) {
+      TypedArrayType::Float32(v.into())
+    }
+    else if js_sys::Float64Array::instanceof(&v) {
+      TypedArrayType::Float64(v.into())
+    }
+    // else if js_sys::BigInt64Array::instanceof(&v) {
+    //   TypedArrayType::BigInt64(v.into())
+    // }
+    // else if js_sys::BigUint64Array::instanceof(&v) {
+    //   TypedArrayType::BigUint64(v.into())
+    // }
+    else {
+      panic!("unknown dtype")
+    }
+  }
+}
