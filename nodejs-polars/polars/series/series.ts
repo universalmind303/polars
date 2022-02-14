@@ -1014,6 +1014,8 @@ export const seriesWrapper = <T>(_s: JsSeries): Series<T> => {
     try {
       return pli.series[method]({_series, ...args });
     } catch {
+      console.log(`series.${method}`);
+
       return _series[method]({_series, ...args });
     }
   };

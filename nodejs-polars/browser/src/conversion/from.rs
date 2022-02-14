@@ -79,13 +79,38 @@ where
 
 impl FromJsValue for String {
   fn from_js(val: JsValue) -> JsResult<Self> {
-    Ok(val.as_string().unwrap())
+    match val.as_string() {
+      Some(v) => Ok(v),
+      None => Err(JsPolarsEr::Other("invalid cast".into()).into())
+    }
   }
 }
 
 impl FromJsValue for bool {
   fn from_js(val: JsValue) -> JsResult<Self> {
-    Ok(val.as_bool().unwrap())
+    match val.as_bool() {
+      Some(v) => Ok(v),
+      None => Err(JsPolarsEr::Other("invalid cast".into()).into())
+    }
+  }
+}
+impl FromJsValue for u64 {
+  fn from_js(val: JsValue) -> JsResult<Self> {
+    if val.is_bigint() {
+      Ok(val.as_string().unwrap().parse::<u64>().unwrap())
+    } else {
+      Err(JsPolarsEr::Other("invalid cast".into()).into())
+    }
+  }
+}
+
+impl FromJsValue for i64 {
+  fn from_js(val: JsValue) -> JsResult<Self> {
+    if val.is_bigint() {
+      Ok(val.as_string().unwrap().parse::<i64>().unwrap())
+    } else {
+      Err(JsPolarsEr::Other("invalid cast".into()).into())
+    }
   }
 }
 
@@ -93,15 +118,17 @@ macro_rules! numbers {
     ($($n:ident)*) => ($(
         impl FromJsValue for $n {
             fn from_js(val: JsValue) -> JsResult<Self>  {
-              let val = val.as_f64().unwrap();
-              Ok(val as $n)
+              match val.as_f64() {
+                Some(v) => Ok(v as $n),
+                None => Err(JsPolarsEr::Other("invalid cast".into()).into())
+              }
             }
         }
     )*)
 }
 
 // todo support bigint
-numbers! { i8 u8 i16 u16 i32 u32 f32 f64 i64 u64 usize }
+numbers! { i8 u8 i16 u16 i32 u32 f32 f64 usize }
 
 impl FromJsValue for Utf8Chunked {
   fn from_js(val: JsValue) -> JsResult<Self> {
@@ -157,5 +184,3 @@ impl WrappedValue {
     V::from_js(self.0)
   }
 }
-
-

@@ -111,8 +111,8 @@ pub enum TypedArrayType {
   Uint32(js_sys::Uint32Array),
   Float32(js_sys::Float32Array),
   Float64(js_sys::Float64Array),
-  // BigInt64(js_sys::BigInt64Array),
-  // BigUint64(js_sys::BigUint64Array),
+  BigInt64(js_sys::BigInt64Array),
+  BigUint64(js_sys::BigUint64Array),
 }
 
 impl From<wasm_bindgen::JsValue> for TypedArrayType {
@@ -146,12 +146,12 @@ impl From<wasm_bindgen::JsValue> for TypedArrayType {
     else if js_sys::Float64Array::instanceof(&v) {
       TypedArrayType::Float64(v.into())
     }
-    // else if js_sys::BigInt64Array::instanceof(&v) {
-    //   TypedArrayType::BigInt64(v.into())
-    // }
-    // else if js_sys::BigUint64Array::instanceof(&v) {
-    //   TypedArrayType::BigUint64(v.into())
-    // }
+    else if js_sys::BigInt64Array::instanceof(&v) {
+      TypedArrayType::BigInt64(v.into())
+    }
+    else if js_sys::BigUint64Array::instanceof(&v) {
+      TypedArrayType::BigUint64(v.into())
+    }
     else {
       panic!("unknown dtype")
     }

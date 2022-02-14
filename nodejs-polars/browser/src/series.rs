@@ -17,11 +17,38 @@ impl From<Series> for JsSeries {
 
 macro_rules! typed_to_series {
     ($series_name:expr, $arr:expr,$pl_type:ty) => {{
-        let s = ChunkedArray::<$pl_type>::new_from_aligned_vec(&$series_name, $arr.to_vec())
-            .into_series();
-        JsSeries::from(s)
+        let s = ChunkedArray::<$pl_type>::from_vec(&$series_name, $arr.to_vec()).into_series();
+        Ok(JsSeries::from(s))
     }};
 }
+macro_rules! init_method {
+    ($name:ident, $type:ty) => {
+        #[wasm_bindgen(js_class=series)]
+        impl JsSeries {
+            #[wasm_bindgen]
+            pub fn $name(params: JsValue) -> JsResult<JsSeries> {
+                let params = WrappedObject(params);
+                let name = params.get_as::<String>("name")?;
+                let values = params.get_as::<Vec<$type>>("values")?;
+                Ok(Series::new(&name, values).into())
+            }
+        }
+    };
+}
+
+init_method!(new_bool, bool);
+init_method!(new_str, String);
+init_method!(new_i8, i8);
+init_method!(new_i16, i16);
+init_method!(new_i32, i32);
+init_method!(new_i64, i64);
+init_method!(new_u8, u8);
+init_method!(new_u16, u16);
+init_method!(new_u32, u32);
+init_method!(new_u64, u64);
+init_method!(new_f32, f32);
+init_method!(new_f64, f64);
+
 #[wasm_bindgen(js_class=series)]
 impl JsSeries {
     #[wasm_bindgen]
@@ -29,7 +56,7 @@ impl JsSeries {
         let params = WrappedObject(params);
         let name = params.get_as::<String>("name")?;
         let values: TypedArrayType = params.get("values")?.into();
-        let series = match values {
+        match values {
             TypedArrayType::Int8(v) => typed_to_series!(&name, v, Int8Type),
             TypedArrayType::Uint8(v) => typed_to_series!(&name, v, UInt8Type),
             TypedArrayType::Uint8Clamped(v) => typed_to_series!(&name, v, UInt8Type),
@@ -39,22 +66,23 @@ impl JsSeries {
             TypedArrayType::Uint32(v) => typed_to_series!(&name, v, UInt32Type),
             TypedArrayType::Float32(v) => typed_to_series!(&name, v, Float32Type),
             TypedArrayType::Float64(v) => typed_to_series!(&name, v, Float64Type),
-            // TypedArrayType::BigInt64(v) => typed_to_series!(&name, v, Int64Type),
-            // TypedArrayType::BigUint64(v) => typed_to_series!(&name, v, UInt64Type),
-        };
-        Ok(series)
-        // let v = buff.into_value()?;
-        // let mut series = from_typed_array(&v)?;
-        // series.rename(name);
-        // series.try_into_js(&cx)
+            TypedArrayType::BigInt64(v) => {
+                return Err(JsError::new("BigInt64Array not supported").into())
+            }
+            TypedArrayType::BigUint64(v) => {
+                return Err(JsError::new("BigUint64Array not supported").into())
+            }
+        }
     }
+
     #[wasm_bindgen]
-    pub fn new_bool(params: JsValue) -> JsResult<JsSeries> {
+    pub fn new_date(params: JsValue) -> JsResult<JsSeries> {
         let params = WrappedObject(params);
         let name = params.get_as::<String>("name")?;
-        let values = params.get_as::<Vec<bool>>("values")?;
+        let values = params.get_as::<Vec<String>>("values")?;
         Ok(Series::new(&name, values).into())
     }
+
     #[wasm_bindgen]
     pub fn new_opt_bool(params: JsValue) -> JsResult<JsSeries> {
         let params = WrappedObject(params);
@@ -78,14 +106,6 @@ impl JsSeries {
         }
         let ca: BooleanChunked = builder.finish();
         Ok(ca.into_series().into())
-    }
-
-    #[wasm_bindgen]
-    pub fn new_str(params: JsValue) -> JsResult<JsSeries> {
-        let params = WrappedObject(params);
-        let name = params.get_as::<String>("name")?;
-        let values = params.get_as::<Vec<String>>("values")?;
-        Ok(Series::new(&name, values).into())
     }
 
     #[wasm_bindgen]
@@ -115,14 +135,6 @@ impl JsSeries {
     }
 
     #[wasm_bindgen]
-    pub fn new_u64(params: JsValue) -> JsResult<JsSeries> {
-        let params = WrappedObject(params);
-        let name = params.get_as::<String>("name")?;
-        let values = params.get_as::<Vec<String>>("values")?;
-        Ok(Series::new(&name, values).into())
-    }
-
-    #[wasm_bindgen]
     pub fn new_opt_u64(params: JsValue) -> JsResult<JsSeries> {
         let params = WrappedObject(params);
         let name = params.get_as::<String>("name")?;
@@ -146,13 +158,6 @@ impl JsSeries {
         }
         let ca: ChunkedArray<UInt64Type> = builder.finish();
         Ok(ca.into_series().into())
-    }
-    #[wasm_bindgen]
-    pub fn new_date(params: JsValue) -> JsResult<JsSeries> {
-        let params = WrappedObject(params);
-        let name = params.get_as::<String>("name")?;
-        let values = params.get_as::<Vec<String>>("values")?;
-        Ok(Series::new(&name, values).into())
     }
 
     #[wasm_bindgen]
@@ -188,25 +193,33 @@ impl JsSeries {
     pub fn get_fmt(&self) -> String {
         format!("{}", self.series)
     }
+    pub fn abs(&self) -> JsResult<JsValue> {
+        let s = self.series.abs().map_err(JsPolarsEr::from)?;
+        let s = JsSeries::from(s);
+        Ok(s.into())
+    }
+    pub fn chunk_lengths(&self) -> JsValue {
+        todo!()
+        // js_sys::Float64Array::view(self.series.chunk_lengths().into()).into()
+    }
+    pub fn name(&self) -> String {
+        self.series.name().into()
+    }
+    pub fn rename(&mut self, params: JsValue) -> JsResult<(())> {
+        let params = WrappedObject(params);
+        let name = params.get_as::<String>("name")?;
+        self.series.rename(&name);
+        Ok(())
+    }
 
     pub fn dtype(&self) -> String {
         let dt: JsDataType = self.series.dtype().into();
         dt.to_string()
     }
 
-    pub fn name(&self) -> String {
-        self.series.name().into()
-    }
-
     pub fn len(&self) -> JsValue {
-        self.series.len().into()
-    }
-
-    pub fn rename(&mut self, params: JsValue) -> JsResult<(())> {
-        let params = WrappedObject(params);
-        let name = params.get_as::<String>("name")?;
-        self.series.rename(&name);
-        Ok(())
+        let float_len = self.series.len() as f64;
+        float_len.into()
     }
 
     pub fn cast(&mut self, params: JsValue) -> JsResult<JsSeries> {
@@ -240,8 +253,7 @@ macro_rules! init_method_opt {
                 let mut builder = PrimitiveChunkedBuilder::<$type>::new(&name, len as usize);
                 for i in 0..len {
                     let item = arr.get(i);
-                    let item: WrappedValue = item.into();
-                    match item.extract::<$native>() {
+                    match <$native>::from_js(item) {
                         Ok(val) => builder.append_value(val),
                         Err(e) => {
                             if strict {
@@ -257,9 +269,9 @@ macro_rules! init_method_opt {
         }
     };
 }
+
 init_method_opt!(new_opt_u16, UInt16Type, u16);
 init_method_opt!(new_opt_u32, UInt32Type, u32);
-// init_method_opt!(new_opt_u64, UInt64Type, u64);
 init_method_opt!(new_opt_i8, Int8Type, i8);
 init_method_opt!(new_opt_i16, Int16Type, i16);
 init_method_opt!(new_opt_i32, Int32Type, i32);
