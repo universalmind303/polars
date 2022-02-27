@@ -19,11 +19,11 @@ module.exports = {
   devServer: {
     contentBase: dist,
   },
-  // plugins: [
-  //   new WasmPackPlugin({
-  //     crateDirectory: __dirname,
-  //   }),
-  // ],
+  plugins: [
+    new WasmPackPlugin({
+      crateDirectory: __dirname,
+    }),
+  ],
   experiments: {
     asyncWebAssembly: true,
     outputModule: true,

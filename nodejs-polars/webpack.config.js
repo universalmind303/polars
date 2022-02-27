@@ -45,7 +45,7 @@ export default {
       type: 'module',
     },
     filename: "polars.js",
-    path: resolve(__dirname, 'browser/dist/polars'), // directory of where the bundle will be created at
+    path: resolve(__dirname, 'bin/browser'),
   },
   plugins: [
     new NodePolyfillPlugin()
