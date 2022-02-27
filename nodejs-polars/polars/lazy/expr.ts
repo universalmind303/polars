@@ -1,18 +1,19 @@
-import {DataType} from "../datatypes";
-import pli from "../internals/polars_internal";
-import {col, lit} from "./functions";
+import {DataType} from "../datatypes.js";
+import pli from "../internals/polars_internal.js";
+import {col, lit} from "../lazy/functions.js";
 import {
   ExprOrString,
   FillNullStrategy,
   RankMethod,
   selectionToExprList,
   INSPECT_SYMBOL
-} from "../utils";
-import {isExternal} from "util/types";
-import {Series} from "../series/series";
+} from "../utils.js";
+import {isExternal} from "../utils.js";
+import {Series} from "../series/series.js";
 
-import * as expr from "./expr/";
-import {Arithmetic, Comparison, Cumulative, Rolling, Round} from "../shared_traits";
+
+import expr from "../lazy/expr/index.js";
+import {Arithmetic, Comparison, Cumulative, Rolling, Round} from "../shared_traits.js";
 
 export interface Expr extends
   Rolling<Expr>,

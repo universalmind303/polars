@@ -1,10 +1,10 @@
-import {NullValues} from "./datatypes";
-import pli from "./internals/polars_internal";
-import {DataFrame, dfWrapper} from "./dataframe";
-import {isPath} from "./utils";
-import {LazyDataFrame} from "./lazy/dataframe";
+import {NullValues} from "./datatypes.js";
+import pli from "./internals/polars_internal.js";
+import {DataFrame, dfWrapper} from "./dataframe.js";
+import {isPath} from "./utils.js";
+import {LazyDataFrame} from "./lazy/dataframe.js";
 import {Readable, Stream} from "stream";
-import {concat} from "./functions";
+import {concat} from "./functions.js";
 
 
 type ScanIPCOptions = {

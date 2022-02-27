@@ -1,7 +1,7 @@
-import pli from "./polars_internal";
-import { DataType, polarsTypeToConstructor } from "../datatypes";
-import { isTypedArray } from "util/types";
-import {Series} from "../series/series";
+import pli from "../internals/polars_internal.js";
+import { DataType, polarsTypeToConstructor } from "../datatypes.js";
+import { isTypedArray } from "../utils.js";
+import {Series} from "../series/series.js";
 
 
 export const jsTypeToPolarsType = (value: unknown): DataType => {

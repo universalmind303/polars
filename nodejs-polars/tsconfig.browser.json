@@ -1,22 +1,21 @@
 {
   "compilerOptions": {
+    "outDir": "./bin.browser",
     "target": "es2020",
     "module": "ESNext",
     "moduleResolution": "nodenext",
-    "outDir": "./bin",
+    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
     "declaration": true,
     "allowJs": true,
     "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "noImplicitAny": false,
     "baseUrl": "./polars",
     "paths": {
       "@polars": [
-        "./index"
+        "./"
       ],
       "@polars/*": [
         "./*"
@@ -50,5 +49,8 @@
       "polars/series/list.ts"
     ],
     "out": "docs"
-  }
+  },
+  "include": [
+    "./polars/*"
+  ],
 }

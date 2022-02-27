@@ -1,8 +1,8 @@
-import {Expr, exprToLitOrExpr} from "./expr";
-import {Series} from "../series/series";
-import { DataFrame } from "../dataframe";
-import { ExprOrString, range, selectionToExprList} from "../utils";
-import pli from "../internals/polars_internal";
+import {Expr, exprToLitOrExpr} from "../lazy/expr.js";
+import {Series} from "../series/series.js";
+import { DataFrame } from "../dataframe.js";
+import { ExprOrString, range, selectionToExprList} from "../utils.js";
+import pli from "../internals/polars_internal.js";
 
 /**
  * __A column in a DataFrame.__

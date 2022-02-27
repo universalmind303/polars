@@ -1,26 +1,15 @@
-/* eslint-disable no-undef */
-/* eslint-disable camelcase */
-import {loadBinding} from "@node-rs/helper";
-import {join} from "path";
-
-// eslint-disable-next-line no-undef
-const up2 = join(__dirname, "../", "../");
-
-
-const isBrowser = () => typeof window === `undefined`;
+const isBrowser = () => typeof window !== `undefined`;
 let pl: any = null;
 
 if (isBrowser()) {
-  const browserPolars = require("../../browser/pkg/polars");
-  console.log(`is browser`);
-  pl = {
-    series: browserPolars.series
-  };
-
+  console.log("loading from browser");
+  const _pl = await import("../../browser/pkg/index.js");
+  pl = _pl;
 }
 else {
-  pl =  loadBinding(up2, "nodejs-polars", "nodejs-polars");
   console.log(`is node.js`);
+  let loadBinding: any = await import("@node-rs/helper");
+  pl = loadBinding("../../", "nodejs-polars", "nodejs-polars");
 
 }
 

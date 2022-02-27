@@ -1,6 +1,6 @@
 
-import {DataFrame, dfWrapper} from "../dataframe";
-import {Expr, exprToLitOrExpr} from "./expr";
+import {DataFrame, dfWrapper} from "../dataframe.js";
+import {Expr, exprToLitOrExpr} from "../lazy/expr.js";
 import {
   columnOrColumnsStrict,
   ColumnSelection,
@@ -8,9 +8,9 @@ import {
   ExprOrString,
   selectionToExprList,
   ValueOrArray
-} from "../utils";
-import pli from "../internals/polars_internal";
-import {LazyGroupBy} from "./groupby";
+} from "../utils.js";
+import pli from "../internals/polars_internal.js";
+import {LazyGroupBy} from "../lazy/groupby.js";
 
 type JsLazyFrame = any;
 

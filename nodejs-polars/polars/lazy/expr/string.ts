@@ -1,7 +1,7 @@
-import {DataType} from "../../datatypes";
-import pli from "../../internals/polars_internal";
-import { regexToString } from "../../utils";
-import {Expr} from "../expr";
+import {DataType} from "../../datatypes.js";
+import pli from "../../internals/polars_internal.js";
+import { regexToString } from "../../utils.js";
+import {Expr} from "../expr.js";
 
 /**
  * namespace containing expr string functions

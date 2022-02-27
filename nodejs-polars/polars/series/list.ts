@@ -1,5 +1,5 @@
-import {JsSeries, Series, seriesWrapper} from "./series";
-import {col} from "../lazy/functions";
+import {JsSeries, Series, seriesWrapper} from "./series.js";
+import {col} from "../lazy/functions.js";
 
 export interface ListFunctions<T> {
   get(index: number): Series<T>

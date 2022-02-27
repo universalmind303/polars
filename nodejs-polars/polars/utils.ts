@@ -1,8 +1,10 @@
-import {Expr, exprToLitOrExpr} from "./lazy/expr";
-import type {Series} from "./series/series";
-import type {DataFrame} from "./dataframe";
+import {Expr, exprToLitOrExpr} from "./lazy/expr.js";
+import type {Series} from "./series/series.js";
+import type {DataFrame} from "./dataframe.js";
 import path from "path";
-import {isExternal, isRegExp} from "util/types";
+import { isTypedArray as _isTypedArray } from "util/types";
+import {TypedArray} from "./datatypes.js";
+
 
 export type ValueOrArray<T> = T | Array<ValueOrArray<T>>;
 export type ColumnSelection = ValueOrArray<string>
@@ -44,6 +46,13 @@ export const range = (start: number, end: number) => {
 };
 
 
+const isBrowser = () => typeof window !== `undefined`;
+export const isExternal = (ty): boolean => {
+  console.log(ty);
+
+  return true;
+};
+export const isTypedArray = (value): value is TypedArray => false;
 export const isDataFrameArray = (ty: any): ty is DataFrame[] => Array.isArray(ty) &&  isExternal(ty[0]?._df);
 export const isSeriesArray = <T>(ty: any): ty is Series<T>[] => Array.isArray(ty) &&  isExternal(ty[0]?._series);
 export const isExprArray = (ty: any): ty is Expr[] => Array.isArray(ty) && isExternal(ty[0]?._expr);
@@ -57,3 +66,16 @@ export const regexToString = (r: string | RegExp): string => {
 };
 
 export const INSPECT_SYMBOL = Symbol.for("nodejs.util.inspect.custom");
+
+
+function isObject(arg): arg is object {
+  return typeof arg === "object" && arg !== null;
+}
+
+function objectToString(o): string {
+  return Object.prototype.toString.call(o);
+}
+
+function isRegExp(re): re is RegExp {
+  return isObject(re) && objectToString(re) === "[object RegExp]";
+}

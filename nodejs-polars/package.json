@@ -1,6 +1,7 @@
 {
   "name": "nodejs-polars",
   "version": "0.3.1",
+  "type": "module",
   "repository": "https://github.com/pola-rs/polars.git",
   "license": "SEE LICENSE IN LICENSE",
   "main": "bin/index.js",
@@ -46,6 +47,7 @@
     "build": "napi build --platform --release polars",
     "build:debug": "napi build --platform",
     "build:ts": " rm -rf bin; tsc -p tsconfig.build.json; mv bin/polars/* bin",
+    "build:browser:ts": " rm -rf bin.browser; tsc -p tsconfig.build.json",
     "format:rs": "cargo fmt",
     "format:source": "prettier --config ./package.json --write './**/*.{js,ts}'",
     "format:yaml": "prettier --parser yaml --write './**/*.{yml,yaml}'",
@@ -61,7 +63,9 @@
     "@types/node": "^16.11.9",
     "@typescript-eslint/eslint-plugin": "^5.4.0",
     "@typescript-eslint/parser": "^5.4.0",
+    "buffer": "^6.0.3",
     "chance": "^1.1.8",
+    "console-browserify": "^1.2.0",
     "eslint": "^8.1.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-import": "^2.25.3",
@@ -71,12 +75,20 @@
     "husky": "^7.0.4",
     "jest": "^27.3.1",
     "lint-staged": "^11.2.6",
+    "node-polyfill-webpack-plugin": "^1.1.4",
+    "path-browserify": "^1.0.1",
     "prettier": "^2.4.1",
     "source-map-support": "^0.5.21",
+    "stream-browserify": "^3.0.0",
     "ts-jest": "^27.1.0",
+    "ts-loader": "^9.2.6",
     "ts-node": "^10.4.0",
+    "tsc-alias": "^1.6.3",
     "typedoc": "^0.22.9",
-    "typescript": "4.4.3"
+    "typescript": "next",
+    "util": "^0.12.4",
+    "webpack": "^5.69.1",
+    "webpack-cli": "^4.9.2"
   },
   "dependencies": {
     "@node-rs/helper": "^1.2.1"

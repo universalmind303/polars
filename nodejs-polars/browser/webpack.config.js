@@ -1,29 +1,33 @@
 const path = require("path");
-const CopyPlugin = require("copy-webpack-plugin");
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 
 const dist = path.resolve(__dirname, "dist");
 
 module.exports = {
-  mode: "production",
+  devtool: 'source-map',
   entry: {
     index: "./js/index.js"
   },
   output: {
     path: dist,
+    library: {
+      type: 'module',
+
+    },
     filename: "[name].js"
   },
   devServer: {
     contentBase: dist,
   },
-  plugins: [
-    new CopyPlugin([
-      path.resolve(__dirname, "static")
-    ]),
-
-    new WasmPackPlugin({
-      target: "nodejs",
-      crateDirectory: __dirname,
-    }),
-  ]
+  // plugins: [
+  //   new WasmPackPlugin({
+  //     crateDirectory: __dirname,
+  //   }),
+  // ],
+  experiments: {
+    asyncWebAssembly: true,
+    outputModule: true,
+    syncWebAssembly: true,
+    futureDefaults: true,
+  },
 };

@@ -1,1 +1,2 @@
-import("../pkg/index.js").catch(console.error);
+import * as pl from '../pkg/index.js';
+export default pl;

@@ -1,18 +1,18 @@
-import pli from "./internals/polars_internal";
-import { arrayToJsDataFrame } from "./internals/construction";
-import {GroupBy} from "./groupby";
-import {LazyDataFrame} from "./lazy/dataframe";
-import {concat} from "./functions";
-import {Expr} from "./lazy/expr";
-import {Series, seriesWrapper} from "./series/series";
+import pli from "./internals/polars_internal.js";
+import { arrayToJsDataFrame } from "./internals/construction.js";
+import {GroupBy} from "./groupby.js";
+import {LazyDataFrame} from "./lazy/dataframe.js";
+import {concat} from "./functions.js";
+import {Expr} from "./lazy/expr.js";
+import {Series, seriesWrapper} from "./series/series.js";
 import {Stream, Writable} from "stream";
-import {isExternal} from "util/types";
+import {isExternal} from "./utils.js";
 
 import {
   DataType,
   JoinBaseOptions,
   JsDataFrame
-} from "./datatypes";
+} from "./datatypes.js";
 
 import {
   columnOrColumns,
@@ -23,10 +23,10 @@ import {
   ColumnsOrExpr,
   ValueOrArray,
   ExprOrString
-} from "./utils";
+} from "./utils.js";
 
-import {Arithmetic} from "./shared_traits";
-import {col} from "./lazy/functions";
+import {Arithmetic} from "./shared_traits.js";
+import {col} from "./lazy/functions.js";
 
 const inspect = Symbol.for("nodejs.util.inspect.custom");
 

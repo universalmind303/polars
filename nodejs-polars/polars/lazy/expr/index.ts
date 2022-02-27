@@ -1,6 +1,6 @@
-import * as dt from "./datetime";
-import * as lst from "./list";
-import * as str from "./string";
+import * as dt from "./datetime.js";
+import * as lst from "./list.js";
+import * as str from "./string.js";
 
 namespace expr {
 
@@ -14,4 +14,4 @@ namespace expr {
   export import String = str.ExprString
 }
 
-export = expr
+export default expr;

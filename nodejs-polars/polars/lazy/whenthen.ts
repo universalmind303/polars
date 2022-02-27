@@ -1,5 +1,5 @@
-import {Expr} from "./expr";
-import pli from "../internals/polars_internal";
+import {Expr} from "../lazy/expr.js";
+import pli from "../internals/polars_internal.js";
 
 
 export interface When {

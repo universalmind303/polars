@@ -1,9 +1,9 @@
-import {DataFrame, dfWrapper} from "./dataframe";
-import * as utils from "./utils";
+import {DataFrame, dfWrapper} from "./dataframe.js";
+import * as utils from "./utils.js";
 import util from "util";
-import {Expr} from "./lazy/expr";
-import {col, exclude} from "./lazy/functions";
-import pli from "./internals/polars_internal";
+import {Expr} from "./lazy/expr.js";
+import {col, exclude} from "./lazy/functions.js";
+import pli from "./internals/polars_internal.js";
 
 
 const inspect = Symbol.for("nodejs.util.inspect.custom");

@@ -1,7 +1,7 @@
-import {Expr} from "./expr";
-import {selectionToExprList} from "../utils";
-import pli from "../internals/polars_internal";
-import {LazyDataFrame} from "./dataframe";
+import {Expr} from "../lazy/expr.js";
+import {selectionToExprList} from "../utils.js";
+import pli from "../internals/polars_internal.js";
+import {LazyDataFrame} from "../lazy/dataframe.js";
 
 export interface LazyGroupBy {
   agg(...aggs: Expr[]): LazyDataFrame

@@ -1,5 +1,4 @@
-import {jsTypeToPolarsType} from "@polars/internals/construction";
-import pli from "./internals/polars_internal";
+import pli from "./internals/polars_internal.js";
 
 export type DtypeToPrimitive<T> = T extends DataType.Bool ? boolean :
  T extends DataType.Utf8 ? string :

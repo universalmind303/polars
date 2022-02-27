@@ -1,9 +1,9 @@
 /* eslint-disable no-redeclare */
-import {jsTypeToPolarsType} from "./internals/construction";
-import {Series, seriesWrapper} from "./series/series";
-import {DataFrame, dfWrapper} from "./dataframe";
-import pli from "./internals/polars_internal";
-import {isDataFrameArray, isSeriesArray} from "./utils";
+import {jsTypeToPolarsType} from "./internals/construction.js";
+import {Series, seriesWrapper} from "./series/series.js";
+import {DataFrame, dfWrapper} from "./dataframe.js";
+import pli from "./internals/polars_internal.js";
+import {isDataFrameArray, isSeriesArray} from "./utils.js";
 
 type ConcatOptions = {rechunk?: boolean, how?: "vertical" | "horizontal"}
 

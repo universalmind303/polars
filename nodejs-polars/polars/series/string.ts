@@ -1,8 +1,8 @@
-import pli from "../internals/polars_internal";
-import {DataType} from "../datatypes";
-import {JsSeries, Series, seriesWrapper} from "./series";
-import {regexToString} from "../utils";
-import {col} from "../lazy/functions";
+import pli from "../internals/polars_internal.js";
+import {DataType} from "../datatypes.js";
+import {JsSeries, Series, seriesWrapper} from "../series/series.js";
+import {regexToString} from "../utils.js";
+import {col} from "../lazy/functions.js";
 
 
 /**
