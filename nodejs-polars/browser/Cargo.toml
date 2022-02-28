@@ -7,7 +7,7 @@ edition = "2021"
 homepage = "https://github.com/pola-rs/polars"
 license = "MIT"
 repository = "https://github.com/pola-rs/polars"
-
+wasm-opt = false
 [lib]
 crate-type = ["cdylib"]
 

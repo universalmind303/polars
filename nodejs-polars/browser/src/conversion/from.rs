@@ -36,7 +36,7 @@ pub fn num_to_polarstype(n: u32) -> DataType {
     14 => DataType::Datetime(TimeUnit::Milliseconds, None),
     15 => DataType::Time,
     // 16 => DataType::Object("object"),
-    17 => DataType::Categorical,
+    17 => DataType::Categorical(None),
     tp => panic!("Type {} not implemented in num_to_polarstype", tp),
   }
 }

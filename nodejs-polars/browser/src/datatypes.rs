@@ -92,7 +92,7 @@ impl From<&DataType> for JsDataType {
       DataType::Time => Time,
 
       // DataType::Object(_) => Object,
-      DataType::Categorical => Categorical,
+      DataType::Categorical(_) => Categorical,
       _ => {
         panic!("null or unknown not expected here")
       }
