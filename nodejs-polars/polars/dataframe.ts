@@ -6,7 +6,6 @@ import {concat} from "./functions.js";
 import {Expr} from "./lazy/expr.js";
 import {Series, seriesWrapper} from "./series/series.js";
 import {Stream, Writable} from "stream";
-import {isExternal} from "./utils.js";
 
 import {
   DataType,
@@ -15,6 +14,7 @@ import {
 } from "./datatypes.js";
 
 import {
+  isExternal,
   columnOrColumns,
   columnOrColumnsStrict,
   ColumnSelection,

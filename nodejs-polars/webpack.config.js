@@ -6,6 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 import {createRequire} from 'module';
 import {fileURLToPath} from 'url';
 const require = createRequire(import.meta.url);
+
 export default {
   devtool: 'source-map',
   entry: './bin/index.js',

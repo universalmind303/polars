@@ -91,7 +91,8 @@
     "webpack-cli": "^4.9.2"
   },
   "dependencies": {
-    "@node-rs/helper": "^1.2.1"
+    "@node-rs/helper": "^1.2.1",
+    "browserify": "^17.0.0"
   },
   "packageManager": "yarn@3.1.1",
   "workspaces": [

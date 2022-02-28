@@ -2,7 +2,7 @@ import {Expr, exprToLitOrExpr} from "./lazy/expr.js";
 import type {Series} from "./series/series.js";
 import type {DataFrame} from "./dataframe.js";
 import path from "path";
-import { isTypedArray as _isTypedArray } from "util/types";
+import * as typeHelpers from "util/types";
 import {TypedArray} from "./datatypes.js";
 
 
@@ -46,13 +46,38 @@ export const range = (start: number, end: number) => {
 };
 
 
-const isBrowser = () => typeof window !== `undefined`;
+export const isBrowser = () => typeof window !== `undefined`;
 export const isExternal = (ty): boolean => {
-  console.log(ty);
-
-  return true;
+  if(isBrowser()) {
+    return typeof ty.ptr === "number";
+  } else {
+    return typeHelpers.isExternal(ty);
+  }
 };
-export const isTypedArray = (value): value is TypedArray => false;
+
+export const isTypedArray = (ty): ty is TypedArray => {
+  if(isBrowser()) {
+    switch (ty[Symbol.toStringTag]){
+    case "Int8Array":
+    case "Int16Array":
+    case "Int32Array":
+    case "Uint8Array":
+    case "Uint8ClampedArray":
+    case "Uint16Array":
+    case "Uint32Array":
+    case "Float32Array":
+    case "Float64Array":
+    case "BigInt64Array":
+    case "BigUint64Array":
+      return true;
+    default:
+      return false;
+    }
+  } else {
+    return typeHelpers.isTypedArray(ty);
+  }
+};
+
 export const isDataFrameArray = (ty: any): ty is DataFrame[] => Array.isArray(ty) &&  isExternal(ty[0]?._df);
 export const isSeriesArray = <T>(ty: any): ty is Series<T>[] => Array.isArray(ty) &&  isExternal(ty[0]?._series);
 export const isExprArray = (ty: any): ty is Expr[] => Array.isArray(ty) && isExternal(ty[0]?._expr);
@@ -61,6 +86,7 @@ export const regexToString = (r: string | RegExp): string => {
   if(isRegExp(r)) {
     return r.source;
   }
+
 
   return r;
 };
