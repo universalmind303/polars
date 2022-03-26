@@ -1612,6 +1612,13 @@ def test_fill_nan() -> None:
     df = pl.DataFrame({"a": [1, 2], "b": [3.0, float("nan")]})
     assert df.fill_nan(4).frame_equal(pl.DataFrame({"a": [1, 2], "b": [3, 4]}))
     assert df["b"].fill_nan(5.0).to_list() == [3.0, 5.0]
+    df = pl.DataFrame(
+        {
+            "a": [1.0, np.nan, 3.0],
+            "b": [datetime(1, 2, 2), datetime(2, 2, 2), datetime(3, 2, 2)],
+        }
+    )
+    assert df.fill_nan(2.0).dtypes == [pl.Float64, pl.Datetime]
 
 
 def test_shift_and_fill() -> None:
@@ -1913,3 +1920,33 @@ def test_preservation_of_subclasses() -> None:
 
     assert isinstance(MyDataFrame().lazy(), MyLazyFrame)
     assert isinstance(MyDataFrame().lazy().collect(), MyDataFrame)
+
+
+def test_preservation_of_subclasses_after_groupby_statements() -> None:
+    """Group by operations should preserve inherited datframe classes."""
+
+    class SubClassedDataFrame(pl.DataFrame):
+        pass
+
+    # A group by operation should preserve the subclass
+    subclassed_df = SubClassedDataFrame({"a": [1, 2], "b": [3, 4]})
+    groupby = subclassed_df.groupby("a")
+    assert isinstance(groupby.agg(pl.count()), SubClassedDataFrame)
+
+    # Round-trips to GBSelection and back should also preserve subclass
+    assert isinstance(groupby["a"].count(), SubClassedDataFrame)
+
+    # Round-trips to PivotOps and back should also preserve subclass
+    assert isinstance(
+        groupby.pivot(pivot_column="a", values_column="b").first(),
+        SubClassedDataFrame,
+    )
+
+
+def test_explode_empty() -> None:
+    df = (
+        pl.DataFrame(dict(x=["a", "a", "b", "b"], y=[1, 1, 2, 2]))
+        .groupby("x")
+        .agg(pl.col("y").take([]))
+    )
+    assert df.explode("y").shape == (0, 2)

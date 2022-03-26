@@ -62,6 +62,7 @@ Descriptive stats
    :toctree: api/
 
     Series.describe
+    Series.unique_counts
     Series.value_counts
     Series.chunk_lengths
     Series.n_chunks
@@ -128,6 +129,7 @@ Computations
     Series.pct_change
     Series.skew
     Series.kurtosis
+    Series.entropy
     Series.sqrt
     Series.sin
     Series.cos
@@ -138,6 +140,7 @@ Computations
     Series.log
     Series.log10
     Series.exp
+    Series.sign
 
 Manipulation/ selection
 -----------------------

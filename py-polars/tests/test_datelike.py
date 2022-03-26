@@ -565,3 +565,36 @@ def test_default_negative_every_offset_dynamic_groupby() -> None:
         }
     )
     assert out.frame_equal(expected)
+
+
+def test_strptime_dates_datetimes() -> None:
+    s = pl.Series("date", ["2021-04-22", "2022-01-04 00:00:00"])
+    assert s.str.strptime(pl.Datetime).to_list() == [
+        datetime(2021, 4, 22, 0, 0),
+        datetime(2022, 1, 4, 0, 0),
+    ]
+
+
+def test_asof_join_tolerance_grouper() -> None:
+    from datetime import date
+
+    df1 = pl.DataFrame({"date": [date(2020, 1, 5), date(2020, 1, 10)], "by": [1, 1]})
+    df2 = pl.DataFrame(
+        {
+            "date": [date(2020, 1, 5), date(2020, 1, 6)],
+            "by": [1, 1],
+            "values": [100, 200],
+        }
+    )
+
+    out = df1.join_asof(df2, by="by", on="date", tolerance="3d")
+
+    expected = pl.DataFrame(
+        {
+            "date": [date(2020, 1, 5), date(2020, 1, 10)],
+            "by": [1, 1],
+            "values": [100, None],
+        }
+    )
+
+    assert out.frame_equal(expected)

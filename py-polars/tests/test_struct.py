@@ -91,3 +91,34 @@ def struct_unnesting() -> None:
         .collect()
     )
     out.frame_equal(expected)
+
+
+def test_struct_function_expansion() -> None:
+    df = pl.DataFrame(
+        {"a": [1, 2, 3, 4], "b": ["one", "two", "three", "four"], "c": [9, 8, 7, 6]}
+    )
+    assert df.with_column(pl.struct(pl.col(["a", "b"])))["a"].struct.fields == [
+        "a",
+        "b",
+    ]
+
+
+def test_value_counts_expr() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["a", "b", "b", "c", "c", "c"],
+        }
+    )
+
+    out = (
+        df.select(
+            [
+                pl.col("id").value_counts(),
+            ]
+        )
+        .to_series()
+        .to_list()
+    )
+
+    out = sorted(out)  # type: ignore
+    assert out == [("a", 1), ("b", 2), ("c", 3)]

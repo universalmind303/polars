@@ -8,7 +8,7 @@ use polars::lazy::frame::{AllowedOptimizations, LazyCsvReader, LazyFrame, LazyGr
 use polars::lazy::prelude::col;
 use polars::prelude::{ClosedWindow, CsvEncoding, DataFrame, Field, JoinType, Schema};
 use polars::time::*;
-use polars_core::frame::DistinctKeepStrategy;
+use polars_core::frame::UniqueKeepStrategy;
 use polars_core::prelude::{
     AnyValue, AsOfOptions, AsofStrategy, DataType, QuantileInterpolOptions, SortOptions,
 };
@@ -111,6 +111,7 @@ impl PyLazyFrame {
         skip_rows_after_header: usize,
         encoding: &str,
         row_count: Option<(String, u32)>,
+        parse_dates: bool,
     ) -> PyResult<Self> {
         let null_values = null_values.map(|w| w.0);
         let comment_char = comment_char.map(|s| s.as_bytes()[0]);
@@ -151,6 +152,7 @@ impl PyLazyFrame {
             .with_skip_rows_after_header(skip_rows_after_header)
             .with_encoding(encoding)
             .with_row_count(row_count)
+            .with_parse_dates(parse_dates)
             .with_null_values(null_values);
 
         if let Some(lambda) = with_schema_modify {
@@ -569,16 +571,16 @@ impl PyLazyFrame {
         ldf.explode(column).into()
     }
 
-    pub fn distinct(
+    pub fn unique(
         &self,
         maintain_order: bool,
         subset: Option<Vec<String>>,
-        keep: Wrap<DistinctKeepStrategy>,
+        keep: Wrap<UniqueKeepStrategy>,
     ) -> Self {
         let ldf = self.ldf.clone();
         match maintain_order {
-            true => ldf.distinct_stable(subset, keep.0),
-            false => ldf.distinct(subset, keep.0),
+            true => ldf.unique_stable(subset, keep.0),
+            false => ldf.unique(subset, keep.0),
         }
         .into()
     }

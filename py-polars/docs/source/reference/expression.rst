@@ -40,6 +40,7 @@ These functions can be used as expression and sometimes also in eager contexts.
    groups
    quantile
    arange
+   repeat
    argsort_by
    concat_str
    concat_list
@@ -150,6 +151,7 @@ Computations
     Expr.pct_change
     Expr.skew
     Expr.kurtosis
+    Expr.entropy
     Expr.sqrt
     Expr.sin
     Expr.cos
@@ -160,6 +162,9 @@ Computations
     Expr.log
     Expr.log10
     Expr.exp
+    Expr.sign
+    Expr.unique_counts
+    Expr.value_counts
 
 Manipulation/ selection
 -----------------------
@@ -178,6 +183,7 @@ Manipulation/ selection
     Expr.cast
     Expr.sort
     Expr.arg_sort
+    Expr.argsort
     Expr.sort_by
     Expr.take
     Expr.shift
@@ -195,7 +201,7 @@ Manipulation/ selection
     Expr.drop_nulls
     Expr.drop_nans
     Expr.interpolate
-    Expr.argsort
+    Expr.arg_sort
     Expr.clip
     Expr.lower_bound
     Expr.upper_bound

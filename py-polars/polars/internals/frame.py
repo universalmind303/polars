@@ -11,6 +11,7 @@ from typing import (
     BinaryIO,
     Callable,
     Dict,
+    Generic,
     Iterable,
     Iterator,
     List,
@@ -903,6 +904,60 @@ class DataFrame(metaclass=DataFrameMetaClass):
         to_string: bool = False,
     ) -> Optional[str]:
         """
+        .. deprecated:: 0.13.12
+            Please use `write_json`
+        """
+        warnings.warn("'to_json' is deprecated. please use 'write_json'")
+        return self.write_json(
+            file, pretty, row_oriented, json_lines, to_string=to_string
+        )
+
+    @overload
+    def write_json(
+        self,
+        file: Optional[Union[IOBase, str, Path]] = ...,
+        pretty: bool = ...,
+        row_oriented: bool = ...,
+        json_lines: bool = ...,
+        *,
+        to_string: Literal[True],
+    ) -> str:
+        ...
+
+    @overload
+    def write_json(
+        self,
+        file: Optional[Union[IOBase, str, Path]] = ...,
+        pretty: bool = ...,
+        row_oriented: bool = ...,
+        json_lines: bool = ...,
+        *,
+        to_string: Literal[False] = ...,
+    ) -> None:
+        ...
+
+    @overload
+    def write_json(
+        self,
+        file: Optional[Union[IOBase, str, Path]] = ...,
+        pretty: bool = ...,
+        row_oriented: bool = ...,
+        json_lines: bool = ...,
+        *,
+        to_string: bool = ...,
+    ) -> Optional[str]:
+        ...
+
+    def write_json(
+        self,
+        file: Optional[Union[IOBase, str, Path]] = None,
+        pretty: bool = False,
+        row_oriented: bool = False,
+        json_lines: bool = False,
+        *,
+        to_string: bool = False,
+    ) -> Optional[str]:
+        """
         Serialize to JSON representation.
 
         Parameters
@@ -969,11 +1024,12 @@ class DataFrame(metaclass=DataFrameMetaClass):
         tbl = pa.Table.from_batches(record_batches)
         return tbl.to_pandas(*args, date_as_object=date_as_object, **kwargs)
 
-    def to_csv(
+    def write_csv(
         self,
         file: Optional[Union[TextIO, BytesIO, str, Path]] = None,
         has_header: bool = True,
         sep: str = ",",
+        quote: str = '"',
     ) -> Optional[str]:
         """
         Write Dataframe to comma-separated values file (csv).
@@ -983,9 +1039,11 @@ class DataFrame(metaclass=DataFrameMetaClass):
         file
             File path to which the file should be written.
         has_header
-            Whether or not to include header in the CSV output.
+            Whether to include header in the CSV output.
         sep
             Separate CSV fields with this symbol.
+        quote
+            byte to use as quoting character
 
         Examples
         --------
@@ -997,21 +1055,38 @@ class DataFrame(metaclass=DataFrameMetaClass):
         ...         "ham": ["a", "b", "c", "d", "e"],
         ...     }
         ... )
-        >>> df.to_csv("new_file.csv", sep=",")
+        >>> df.write_csv("new_file.csv", sep=",")
 
         """
+        if len(sep) > 1:
+            raise ValueError("only single byte separator is allowed")
+        if len(quote) > 1:
+            raise ValueError("only single byte quote char is allowed")
         if file is None:
             buffer = BytesIO()
-            self._df.to_csv(buffer, has_header, ord(sep))
+            self._df.to_csv(buffer, has_header, ord(sep), ord(quote))
             return str(buffer.getvalue(), encoding="utf-8")
 
         if isinstance(file, Path):
             file = str(file)
 
-        self._df.to_csv(file, has_header, ord(sep))
+        self._df.to_csv(file, has_header, ord(sep), ord(quote))
         return None
 
-    def to_avro(
+    def to_csv(
+        self,
+        file: Optional[Union[TextIO, BytesIO, str, Path]] = None,
+        has_header: bool = True,
+        sep: str = ",",
+    ) -> Optional[str]:
+        """
+        .. deprecated:: 0.13.12
+            Please use `write_csv`
+        """
+        warnings.warn("'to_csv' is deprecated. please use 'write_csv'")
+        return self.write_csv(file, has_header, sep)
+
+    def write_avro(
         self,
         file: Union[BinaryIO, BytesIO, str, Path],
         compression: Literal["uncompressed", "snappy", "deflate"] = "uncompressed",
@@ -1034,7 +1109,19 @@ class DataFrame(metaclass=DataFrameMetaClass):
 
         self._df.to_avro(file, compression)
 
-    def to_ipc(
+    def to_avro(
+        self,
+        file: Union[BinaryIO, BytesIO, str, Path],
+        compression: Literal["uncompressed", "snappy", "deflate"] = "uncompressed",
+    ) -> None:
+        """
+        .. deprecated:: 0.13.12
+            Please use `write_avro`
+        """
+        warnings.warn("'to_avro' is deprecated. please use 'write_avro'")
+        return self.write_avro(file, compression)
+
+    def write_ipc(
         self,
         file: Union[BinaryIO, BytesIO, str, Path],
         compression: Optional[Literal["uncompressed", "lz4", "zstd"]] = "uncompressed",
@@ -1058,6 +1145,18 @@ class DataFrame(metaclass=DataFrameMetaClass):
             file = str(file)
 
         self._df.to_ipc(file, compression)
+
+    def to_ipc(
+        self,
+        file: Union[BinaryIO, BytesIO, str, Path],
+        compression: Optional[Literal["uncompressed", "lz4", "zstd"]] = "uncompressed",
+    ) -> None:
+        """
+        .. deprecated:: 0.13.12
+            Please use `write_ipc`
+        """
+        warnings.warn("'to_ipc' is deprecated. please use 'write_ipc'")
+        return self.write_ipc(file, compression)
 
     def to_dicts(self) -> List[Dict[str, Any]]:
         pydf = self._df
@@ -1176,7 +1275,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
             df.columns = names
         return df
 
-    def to_parquet(
+    def write_parquet(
         self,
         file: Union[str, Path, BytesIO],
         compression: Optional[
@@ -1223,7 +1322,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
         if use_pyarrow:
             if not _PYARROW_AVAILABLE:
                 raise ImportError(  # pragma: no cover
-                    "'pyarrow' is required when using 'to_parquet(..., use_pyarrow=True)'."
+                    "'pyarrow' is required when using 'write_parquet(..., use_pyarrow=True)'."
                 )
 
             tbl = self.to_arrow()
@@ -1249,6 +1348,28 @@ class DataFrame(metaclass=DataFrameMetaClass):
             )
         else:
             self._df.to_parquet(file, compression, statistics)
+
+    def to_parquet(
+        self,
+        file: Union[str, Path, BytesIO],
+        compression: Optional[
+            Union[
+                Literal[
+                    "uncompressed", "snappy", "gzip", "lzo", "brotli", "lz4", "zstd"
+                ],
+                str,
+            ]
+        ] = "snappy",
+        statistics: bool = False,
+        use_pyarrow: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        """
+        .. deprecated:: 0.13.12
+            Please use `write_parquet`
+        """
+        warnings.warn("'to_parquet' is deprecated. please use 'write_parquet'")
+        return self.write_parquet(file, compression, statistics, use_pyarrow, **kwargs)
 
     def to_numpy(self) -> np.ndarray:
         """
@@ -2482,10 +2603,10 @@ class DataFrame(metaclass=DataFrameMetaClass):
         return self._from_pydf(self._df.with_row_count(name, offset))
 
     def groupby(
-        self,
+        self: DF,
         by: Union[str, "pli.Expr", Sequence[str], Sequence["pli.Expr"]],
         maintain_order: bool = False,
-    ) -> "GroupBy":
+    ) -> "GroupBy[DF]":
         """
         Start a groupby operation.
 
@@ -2551,15 +2672,20 @@ class DataFrame(metaclass=DataFrameMetaClass):
         """
         if isinstance(by, str):
             by = [by]
-        return GroupBy(self._df, by, maintain_order=maintain_order)  # type: ignore
+        return GroupBy(
+            self._df,
+            by,  # type: ignore
+            dataframe_class=self.__class__,
+            maintain_order=maintain_order,
+        )
 
     def groupby_rolling(
-        self,
+        self: DF,
         index_column: str,
         period: str,
         offset: Optional[str] = None,
         closed: str = "right",
-    ) -> "RollingGroupBy":
+    ) -> "RollingGroupBy[DF]":
         """
         Create rolling groups based on a time column (or index value of type Int32, Int64).
 
@@ -3086,7 +3212,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
         Perform an asof join. This is similar to a left-join except that we
         match on nearest key rather than equal keys.
 
-        Both DataFrames must be sorted by the key.
+        Both DataFrames must be sorted by the asof_join key.
 
         For each row in the left DataFrame:
 
@@ -4514,6 +4640,18 @@ class DataFrame(metaclass=DataFrameMetaClass):
         keep: str = "first",
     ) -> DF:
         """
+        .. deprecated:: 0.13.13
+            Please use `unique`
+        """
+        return self.unique(maintain_order, subset, keep)
+
+    def unique(
+        self: DF,
+        maintain_order: bool = True,
+        subset: Optional[Union[str, List[str]]] = None,
+        keep: str = "first",
+    ) -> DF:
+        """
         Drop duplicate rows from this DataFrame.
         Note that this fails if there is a column of type `List` in the DataFrame or subset.
 
@@ -4532,7 +4670,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
         """
         if subset is not None and not isinstance(subset, list):
             subset = [subset]
-        return self._from_pydf(self._df.distinct(maintain_order, subset, keep))
+        return self._from_pydf(self._df.unique(maintain_order, subset, keep))
 
     def rechunk(self: DF) -> DF:
         """
@@ -4885,7 +5023,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
         """
         return pli.wrap_s(self._df.to_struct(name))
 
-    def unnest(self, names: Union[str, List[str]]) -> "DataFrame":
+    def unnest(self: DF, names: Union[str, List[str]]) -> DF:
         """
         Decompose a struct into its fields. The fields will be inserted in to the `DataFrame` on the
         location of the `struct` type.
@@ -4936,10 +5074,10 @@ class DataFrame(metaclass=DataFrameMetaClass):
         """
         if isinstance(names, str):
             names = [names]
-        return wrap_df(self._df.unnest(names))
+        return self._from_pydf(self._df.unnest(names))
 
 
-class RollingGroupBy:
+class RollingGroupBy(Generic[DF]):
     """
     A rolling grouper. This has an `.agg` method which will allow you to run all polars expressions
     in a groupby context.
@@ -4947,7 +5085,7 @@ class RollingGroupBy:
 
     def __init__(
         self,
-        df: "DataFrame",
+        df: DF,
         index_column: str,
         period: str,
         offset: Optional[str],
@@ -4967,7 +5105,7 @@ class RollingGroupBy:
             List["pli.Expr"],
             "pli.Expr",
         ],
-    ) -> DataFrame:
+    ) -> DF:
         return (
             self.df.lazy()
             .groupby_rolling(
@@ -4981,7 +5119,7 @@ class RollingGroupBy:
         )
 
 
-class DynamicGroupBy:
+class DynamicGroupBy(Generic[DF]):
     """
     A dynamic grouper. This has an `.agg` method which will allow you to run all polars expressions
     in a groupby context.
@@ -4989,7 +5127,7 @@ class DynamicGroupBy:
 
     def __init__(
         self,
-        df: "DataFrame",
+        df: DF,
         index_column: str,
         every: str,
         period: Optional[str],
@@ -5017,7 +5155,7 @@ class DynamicGroupBy:
             List["pli.Expr"],
             "pli.Expr",
         ],
-    ) -> DataFrame:
+    ) -> DF:
         return (
             self.df.lazy()
             .groupby_dynamic(
@@ -5035,7 +5173,7 @@ class DynamicGroupBy:
         )
 
 
-class GroupBy:
+class GroupBy(Generic[DF]):
     """
     Starts a new GroupBy operation.
 
@@ -5074,19 +5212,38 @@ class GroupBy:
         self,
         df: "PyDataFrame",
         by: Union[str, List[str]],
+        dataframe_class: Type[DF],
         maintain_order: bool = False,
     ):
+        """
+        Construct class representing a group by operation over the given dataframe.
+
+        Parameters
+        ----------
+        df
+            PyDataFrame to perform operation over.
+        by
+            Column(s) to group by.
+        dataframe_class
+            The class used to wrap around the given dataframe. Used to construct new
+            dataframes returned from the group by operation.
+        maintain_order
+            Make sure that the order of the groups remain consistent. This is more
+            expensive than a default groupby. Note that this only works in expression
+            aggregations.
+        """
         self._df = df
+        self._dataframe_class = dataframe_class
         self.by = by
         self.maintain_order = maintain_order
 
-    def __getitem__(self, item: Any) -> "GBSelection":
+    def __getitem__(self, item: Any) -> "GBSelection[DF]":
         print(
             "accessing GroupBy by index is deprecated, consider using the `.agg` method"
         )
         return self._select(item)
 
-    def _select(self, columns: Union[str, List[str]]) -> "GBSelection":
+    def _select(self, columns: Union[str, List[str]]) -> "GBSelection[DF]":
         """
         Select the columns that will be aggregated.
 
@@ -5100,16 +5257,21 @@ class GroupBy:
         )
         if isinstance(columns, str):
             columns = [columns]
-        return GBSelection(self._df, self.by, columns)
+        return GBSelection(
+            self._df,
+            self.by,
+            columns,
+            dataframe_class=self._dataframe_class,
+        )
 
     def __iter__(self) -> Iterable[Any]:
         groups_df = self.groups()
         groups = groups_df["groups"]
-        df = wrap_df(self._df)
+        df = self._dataframe_class._from_pydf(self._df)
         for i in range(groups_df.height):
             yield df[groups[i]]
 
-    def get_group(self, group_value: Union[Any, Tuple[Any]]) -> DataFrame:
+    def get_group(self, group_value: Union[Any, Tuple[Any]]) -> DF:
         """
         Select a single group as a new DataFrame.
 
@@ -5167,10 +5329,10 @@ class GroupBy:
         except IndexError:
             raise ValueError(f"no group: {group_value} found")
 
-        df = wrap_df(self._df)
+        df = self._dataframe_class._from_pydf(self._df)
         return df[groups_idx]
 
-    def groups(self) -> DataFrame:
+    def groups(self) -> DF:
         """
         Return a `DataFrame` with:
 
@@ -5180,9 +5342,11 @@ class GroupBy:
         warnings.warn(
             "accessing GroupBy by index is deprecated, consider using the `.agg` method"
         )
-        return wrap_df(self._df.groupby(self.by, None, "groups"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, None, "groups")
+        )
 
-    def apply(self, f: Callable[[DataFrame], DataFrame]) -> DataFrame:
+    def apply(self, f: Callable[[DataFrame], DataFrame]) -> DF:
         """
         Apply a function over the groups as a sub-DataFrame.
 
@@ -5197,7 +5361,7 @@ class GroupBy:
         -------
         DataFrame
         """
-        return wrap_df(self._df.groupby_apply(self.by, f))
+        return self._dataframe_class._from_pydf(self._df.groupby_apply(self.by, f))
 
     def agg(
         self,
@@ -5207,7 +5371,7 @@ class GroupBy:
             List["pli.Expr"],
             "pli.Expr",
         ],
-    ) -> DataFrame:
+    ) -> DF:
         """
         Use multiple aggregations on columns. This can be combined with complete lazy API
         and is considered idiomatic polars.
@@ -5254,7 +5418,7 @@ class GroupBy:
 
             elif isinstance(column_to_agg[0], pli.Expr):
                 return (
-                    wrap_df(self._df)
+                    self._dataframe_class._from_pydf(self._df)
                     .lazy()
                     .groupby(self.by, maintain_order=self.maintain_order)
                     .agg(column_to_agg)  # type: ignore[arg-type]
@@ -5271,9 +5435,11 @@ class GroupBy:
                 f"argument: {column_to_agg} not understood, have you passed a list of expressions?"
             )
 
-        return wrap_df(self._df.groupby_agg(self.by, column_to_agg))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby_agg(self.by, column_to_agg)
+        )
 
-    def head(self, n: int = 5) -> DataFrame:
+    def head(self, n: int = 5) -> DF:
         """
         Return first n rows of each group.
 
@@ -5331,14 +5497,14 @@ class GroupBy:
 
         """
         return (
-            wrap_df(self._df)
+            self._dataframe_class._from_pydf(self._df)
             .lazy()
             .groupby(self.by, self.maintain_order)
             .head(n)
             .collect(no_optimization=True, string_cache=False)
         )
 
-    def tail(self, n: int = 5) -> DataFrame:
+    def tail(self, n: int = 5) -> DF:
         """
         Return last n rows of each group.
 
@@ -5395,24 +5561,33 @@ class GroupBy:
 
         """
         return (
-            wrap_df(self._df)
+            self._dataframe_class._from_pydf(self._df)
             .lazy()
             .groupby(self.by, self.maintain_order)
             .tail(n)
             .collect(no_optimization=True, string_cache=False)
         )
 
-    def _select_all(self) -> "GBSelection":
+    def _select_all(self) -> "GBSelection[DF]":
         """
         Select all columns for aggregation.
         """
-        return GBSelection(self._df, self.by, None)
+        return GBSelection(
+            self._df,
+            self.by,
+            None,
+            dataframe_class=self._dataframe_class,
+        )
 
     def pivot(
         self, pivot_column: Union[str, List[str]], values_column: Union[str, List[str]]
-    ) -> "PivotOps":
+    ) -> "PivotOps[DF]":
         """
         Do a pivot operation based on the group key, a pivot column and an aggregation function on the values column.
+
+        .. note::
+            Polars'/arrow memory is not ideal for transposing operations like pivots. If you have a relatively large
+            table, consider using a groupby over a pivot.
 
         Parameters
         ----------
@@ -5448,57 +5623,63 @@ class GroupBy:
             pivot_column = [pivot_column]
         if isinstance(values_column, str):
             values_column = [values_column]
-        return PivotOps(self._df, self.by, pivot_column, values_column)
+        return PivotOps(
+            self._df,
+            self.by,
+            pivot_column,
+            values_column,
+            dataframe_class=self._dataframe_class,
+        )
 
-    def first(self) -> DataFrame:
+    def first(self) -> DF:
         """
         Aggregate the first values in the group.
         """
         return self.agg(pli.all().first())
 
-    def last(self) -> DataFrame:
+    def last(self) -> DF:
         """
         Aggregate the last values in the group.
         """
         return self.agg(pli.all().last())
 
-    def sum(self) -> DataFrame:
+    def sum(self) -> DF:
         """
         Reduce the groups to the sum.
         """
         return self.agg(pli.all().sum())
 
-    def min(self) -> DataFrame:
+    def min(self) -> DF:
         """
         Reduce the groups to the minimal value.
         """
         return self.agg(pli.all().min())
 
-    def max(self) -> DataFrame:
+    def max(self) -> DF:
         """
         Reduce the groups to the maximal value.
         """
         return self.agg(pli.all().max())
 
-    def count(self) -> DataFrame:
+    def count(self) -> DF:
         """
         Count the number of values in each group.
         """
         return self.agg(pli.lazy_functions.count())
 
-    def mean(self) -> DataFrame:
+    def mean(self) -> DF:
         """
         Reduce the groups to the mean values.
         """
         return self.agg(pli.all().mean())
 
-    def n_unique(self) -> DataFrame:
+    def n_unique(self) -> DF:
         """
         Count the unique values per group.
         """
         return self.agg(pli.all().n_unique())
 
-    def quantile(self, quantile: float, interpolation: str = "nearest") -> DataFrame:
+    def quantile(self, quantile: float, interpolation: str = "nearest") -> DF:
         """
         Compute the quantile per group.
 
@@ -5513,13 +5694,13 @@ class GroupBy:
         """
         return self.agg(pli.all().quantile(quantile, interpolation))
 
-    def median(self) -> DataFrame:
+    def median(self) -> DF:
         """
         Return the median per group.
         """
         return self.agg(pli.all().median())
 
-    def agg_list(self) -> DataFrame:
+    def agg_list(self) -> DF:
         """
         Aggregate the groups into Series.
 
@@ -5543,7 +5724,7 @@ class GroupBy:
         return self.agg(pli.all().list())
 
 
-class PivotOps:
+class PivotOps(Generic[DF]):
     """
     Utility class returned in a pivot operation.
     """
@@ -5554,78 +5735,80 @@ class PivotOps:
         by: Union[str, List[str]],
         pivot_column: Union[str, List[str]],
         values_column: Union[str, List[str]],
+        dataframe_class: Type[DF],
     ):
         self._df = df
         self.by = by
         self.pivot_column = pivot_column
         self.values_column = values_column
+        self._dataframe_class = dataframe_class
 
-    def first(self) -> DataFrame:
+    def first(self) -> DF:
         """
         Get the first value per group.
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.pivot(self.by, self.pivot_column, self.values_column, "first")
         )
 
-    def sum(self) -> DataFrame:
+    def sum(self) -> DF:
         """
         Get the sum per group.
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.pivot(self.by, self.pivot_column, self.values_column, "sum")
         )
 
-    def min(self) -> DataFrame:
+    def min(self) -> DF:
         """
         Get the minimal value per group.
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.pivot(self.by, self.pivot_column, self.values_column, "min")
         )
 
-    def max(self) -> DataFrame:
+    def max(self) -> DF:
         """
         Get the maximal value per group.
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.pivot(self.by, self.pivot_column, self.values_column, "max")
         )
 
-    def mean(self) -> DataFrame:
+    def mean(self) -> DF:
         """
         Get the mean value per group.
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.pivot(self.by, self.pivot_column, self.values_column, "mean")
         )
 
-    def count(self) -> DataFrame:
+    def count(self) -> DF:
         """
         Count the values per group.
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.pivot(self.by, self.pivot_column, self.values_column, "count")
         )
 
-    def median(self) -> DataFrame:
+    def median(self) -> DF:
         """
         Get the median value per group.
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.pivot(self.by, self.pivot_column, self.values_column, "median")
         )
 
-    def last(self) -> DataFrame:
+    def last(self) -> DF:
         """
         Get the last value per group.
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.pivot(self.by, self.pivot_column, self.values_column, "last")
         )
 
 
-class GBSelection:
+class GBSelection(Generic[DF]):
     """
     Utility class returned in a groupby operation.
     """
@@ -5635,42 +5818,54 @@ class GBSelection:
         df: "PyDataFrame",
         by: Union[str, List[str]],
         selection: Optional[List[str]],
+        dataframe_class: Type[DF],
     ):
         self._df = df
         self.by = by
         self.selection = selection
+        self._dataframe_class = dataframe_class
 
-    def first(self) -> DataFrame:
+    def first(self) -> DF:
         """
         Aggregate the first values in the group.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "first"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "first")
+        )
 
-    def last(self) -> DataFrame:
+    def last(self) -> DF:
         """
         Aggregate the last values in the group.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "last"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "last")
+        )
 
-    def sum(self) -> DataFrame:
+    def sum(self) -> DF:
         """
         Reduce the groups to the sum.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "sum"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "sum")
+        )
 
-    def min(self) -> DataFrame:
+    def min(self) -> DF:
         """
         Reduce the groups to the minimal value.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "min"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "min")
+        )
 
-    def max(self) -> DataFrame:
+    def max(self) -> DF:
         """
         Reduce the groups to the maximal value.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "max"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "max")
+        )
 
-    def count(self) -> DataFrame:
+    def count(self) -> DF:
         """
         Count the number of values in each group.
 
@@ -5698,21 +5893,27 @@ class GBSelection:
         └─────┴───────┘
 
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "count"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "count")
+        )
 
-    def mean(self) -> DataFrame:
+    def mean(self) -> DF:
         """
         Reduce the groups to the mean values.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "mean"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "mean")
+        )
 
-    def n_unique(self) -> DataFrame:
+    def n_unique(self) -> DF:
         """
         Count the unique values per group.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "n_unique"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "n_unique")
+        )
 
-    def quantile(self, quantile: float, interpolation: str = "nearest") -> DataFrame:
+    def quantile(self, quantile: float, interpolation: str = "nearest") -> DF:
         """
         Compute the quantile per group.
 
@@ -5725,27 +5926,31 @@ class GBSelection:
             interpolation type, options: ['nearest', 'higher', 'lower', 'midpoint', 'linear']
 
         """
-        return wrap_df(
+        return self._dataframe_class._from_pydf(
             self._df.groupby_quantile(self.by, self.selection, quantile, interpolation)
         )
 
-    def median(self) -> DataFrame:
+    def median(self) -> DF:
         """
         Return the median per group.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "median"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "median")
+        )
 
-    def agg_list(self) -> DataFrame:
+    def agg_list(self) -> DF:
         """
         Aggregate the groups into Series.
         """
-        return wrap_df(self._df.groupby(self.by, self.selection, "agg_list"))
+        return self._dataframe_class._from_pydf(
+            self._df.groupby(self.by, self.selection, "agg_list")
+        )
 
     def apply(
         self,
         func: Callable[[Any], Any],
         return_dtype: Optional[Type[DataType]] = None,
-    ) -> DataFrame:
+    ) -> DF:
         """
         Apply a function over the groups.
         """

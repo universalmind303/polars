@@ -74,8 +74,7 @@ dependencies = [
 [[package]]
 name = "arrow2"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c82e291b9b7107a4a2d9d65ee7fa9ceefcf395d791cd9283ee56b29d6d73d4"
+source = "git+https://github.com/jorgecarleitao/arrow2?rev=5658512460d64f8eca0d0ce0ae53aea41c35ab9d#5658512460d64f8eca0d0ce0ae53aea41c35ab9d"
 dependencies = [
  "arrow-format",
  "avro-schema",
@@ -1306,7 +1305,6 @@ dependencies = [
  "lazy_static",
  "ndarray",
  "num",
- "num_cpus",
  "polars-arrow",
  "polars-utils",
  "rand",
@@ -1333,9 +1331,9 @@ dependencies = [
  "memchr",
  "memmap2",
  "num",
- "num_cpus",
  "polars-arrow",
  "polars-core",
+ "polars-time",
  "polars-utils",
  "rayon",
  "regex",
@@ -1399,7 +1397,7 @@ dependencies = [
 
 [[package]]
 name = "py-polars"
-version = "0.13.11"
+version = "0.13.15"
 dependencies = [
  "ahash",
  "bincode",

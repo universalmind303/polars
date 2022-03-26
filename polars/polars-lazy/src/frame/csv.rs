@@ -26,6 +26,7 @@ pub struct LazyCsvReader<'a> {
     skip_rows_after_header: usize,
     encoding: CsvEncoding,
     row_count: Option<RowCount>,
+    parse_dates: bool,
 }
 
 #[cfg(feature = "csv-file")]
@@ -50,6 +51,7 @@ impl<'a> LazyCsvReader<'a> {
             skip_rows_after_header: 0,
             encoding: CsvEncoding::Utf8,
             row_count: None,
+            parse_dates: false,
         }
     }
 
@@ -176,6 +178,13 @@ impl<'a> LazyCsvReader<'a> {
         self
     }
 
+    /// Automatically try to parse dates/ datetimes and time. If parsing fails, columns remain of dtype `[DataType::Utf8]`.
+    #[cfg(feature = "temporal")]
+    pub fn with_parse_dates(mut self, toggle: bool) -> Self {
+        self.parse_dates = toggle;
+        self
+    }
+
     /// Modify a schema before we run the lazy scanning.
     ///
     /// Important! Run this function latest in the builder!
@@ -192,13 +201,23 @@ impl<'a> LazyCsvReader<'a> {
             self.delimiter,
             self.infer_schema_length,
             self.has_header,
-            self.schema_overwrite,
+            // we set it to None and modify them after the schema is updated
+            None,
             &mut skip_rows,
             self.comment_char,
             self.quote_char,
             None,
+            self.parse_dates,
         )?;
-        let schema = f(schema)?;
+        let mut schema = f(schema)?;
+
+        // the dtypes set may be for the new names, so update again
+        if let Some(overwrite_schema) = self.schema_overwrite {
+            for (name, dtype) in overwrite_schema.iter() {
+                schema.with_column(name.clone(), dtype.clone())
+            }
+        }
+
         Ok(self.with_schema(Arc::new(schema)))
     }
 
@@ -222,6 +241,7 @@ impl<'a> LazyCsvReader<'a> {
             self.skip_rows_after_header,
             self.encoding,
             self.row_count,
+            self.parse_dates,
         )?
         .build()
         .into();

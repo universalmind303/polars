@@ -26,7 +26,7 @@ use polars_core::export::arrow::{array::BooleanArray, bitmap::MutableBitmap};
 use polars_core::prelude::*;
 
 use std::fmt::{Debug, Formatter};
-use std::ops::Deref;
+use std::ops::{Deref, Not};
 use std::{
     fmt,
     ops::{Add, Div, Mul, Rem, Sub},
@@ -637,6 +637,31 @@ impl Expr {
         Expr::IsNotNull(Box::new(self))
     }
 
+    /// Drop null values
+    pub fn drop_nulls(self) -> Self {
+        self.apply(|s| Ok(s.drop_nulls()), GetOutput::same_type())
+    }
+
+    /// Drop NaN values
+    pub fn drop_nans(self) -> Self {
+        self.apply(
+            |s| match s.dtype() {
+                DataType::Float32 => {
+                    let ca = s.f32()?;
+                    let mask = ca.is_nan().not();
+                    ca.filter(&mask).map(|ca| ca.into_series())
+                }
+                DataType::Float64 => {
+                    let ca = s.f64()?;
+                    let mask = ca.is_nan().not();
+                    ca.filter(&mask).map(|ca| ca.into_series())
+                }
+                _ => Ok(s),
+            },
+            GetOutput::same_type(),
+        )
+    }
+
     /// Reduce groups to minimal value.
     pub fn min(self) -> Self {
         AggExpr::Min(Box::new(self)).into()
@@ -817,7 +842,7 @@ impl Expr {
         );
         let options = FunctionOptions {
             collect_groups: ApplyOptions::ApplyGroups,
-            input_wildcard_expansion: false,
+            input_wildcard_expansion: true,
             auto_explode: false,
             fmt_str: "arg_sort",
         };
@@ -1458,6 +1483,8 @@ impl Expr {
 
     #[cfg(feature = "repeat_by")]
     #[cfg_attr(docsrs, doc(cfg(feature = "repeat_by")))]
+    /// Repeat the column `n` times, where `n` is determined by the values in `by`.
+    /// This yields an `Expr` of dtype `List`
     pub fn repeat_by(self, by: Expr) -> Expr {
         let function = |s: &mut [Series]| {
             let by = &s[1];
@@ -1466,7 +1493,7 @@ impl Expr {
             Ok(s.repeat_by(by.idx()?).into_series())
         };
 
-        self.map_many(
+        self.apply_many(
             function,
             &[by],
             GetOutput::map_dtype(|dt| DataType::List(dt.clone().into())),
@@ -2043,6 +2070,74 @@ impl Expr {
                 }
             }),
         )
+    }
+
+    #[cfg(feature = "dtype-struct")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "dtype-struct")))]
+    /// Count all unique values and create a struct mapping value to count
+    /// Note that it is better to turn multithreaded off in the aggregation context
+    pub fn value_counts(self, multithreaded: bool) -> Self {
+        self.apply(
+            move |s| {
+                s.value_counts(multithreaded)
+                    .map(|df| df.into_struct(s.name()).into_series())
+            },
+            GetOutput::map_field(|fld| {
+                Field::new(
+                    fld.name(),
+                    DataType::Struct(vec![fld.clone(), Field::new("counts", IDX_DTYPE)]),
+                )
+            }),
+        )
+        .with_fmt("value_counts")
+    }
+
+    #[cfg(feature = "unique_counts")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unique_counts")))]
+    /// Returns a count of the unique values in the order of appearance.
+    /// This method differs from [`Expr::value_counts]` in that it does not return the
+    /// values, only the counts and might be faster
+    pub fn unique_counts(self) -> Self {
+        self.apply(
+            |s| Ok(s.unique_counts().into_series()),
+            GetOutput::from_type(IDX_DTYPE),
+        )
+        .with_fmt("unique_counts")
+    }
+
+    #[cfg(feature = "log")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
+    /// Compute the logarithm to a given base
+    pub fn log(self, base: f64) -> Self {
+        self.map(
+            move |s| Ok(s.log(base)),
+            GetOutput::map_dtype(|dt| {
+                if matches!(dt, DataType::Float32) {
+                    DataType::Float32
+                } else {
+                    DataType::Float64
+                }
+            }),
+        )
+        .with_fmt("log")
+    }
+
+    #[cfg(feature = "log")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
+    /// Compute the entropy as `-sum(pk * log(pk)`.
+    /// where `pk` are discrete probabilities.
+    pub fn entropy(self, base: f64) -> Self {
+        self.apply(
+            move |s| Ok(Series::new(s.name(), [s.entropy(base)])),
+            GetOutput::map_dtype(|dt| {
+                if matches!(dt, DataType::Float32) {
+                    DataType::Float32
+                } else {
+                    DataType::Float64
+                }
+            }),
+        )
+        .with_fmt("entropy")
     }
 
     #[cfg(feature = "strings")]

@@ -100,7 +100,7 @@ pub struct OptState {
     pub predicate_pushdown: bool,
     pub type_coercion: bool,
     pub simplify_expr: bool,
-    /// Make sure that all needed columns are scannedn
+    /// Make sure that all needed columns are scanned
     pub agg_scan_projection: bool,
     pub aggregate_pushdown: bool,
     pub global_string_cache: bool,
@@ -114,7 +114,7 @@ impl Default for OptState {
             predicate_pushdown: true,
             type_coercion: true,
             simplify_expr: true,
-            global_string_cache: true,
+            global_string_cache: false,
             slice_pushdown: true,
             // will be toggled by a scan operation such as csv scan or parquet scan
             agg_scan_projection: false,
@@ -597,6 +597,10 @@ impl LazyFrame {
     pub fn collect(self) -> Result<DataFrame> {
         #[cfg(feature = "dtype-categorical")]
         let use_string_cache = self.opt_state.global_string_cache;
+        #[cfg(feature = "dtype-categorical")]
+        if use_string_cache {
+            eprint!("global string cache in combination with LazyFrames is deprecated; please set the global string cache globally.")
+        }
         let mut expr_arena = Arena::with_capacity(256);
         let mut lp_arena = Arena::with_capacity(128);
         let lp_top = self.optimize(&mut lp_arena, &mut expr_arena)?;
@@ -935,10 +939,10 @@ impl LazyFrame {
     }
 
     /// Keep unique rows and maintain order
-    pub fn distinct_stable(
+    pub fn unique_stable(
         self,
         subset: Option<Vec<String>>,
-        keep_strategy: DistinctKeepStrategy,
+        keep_strategy: UniqueKeepStrategy,
     ) -> LazyFrame {
         let opt_state = self.get_opt_state();
         let options = DistinctOptions {
@@ -951,10 +955,10 @@ impl LazyFrame {
     }
 
     /// Keep unique rows, do not maintain order
-    pub fn distinct(
+    pub fn unique(
         self,
         subset: Option<Vec<String>>,
-        keep_strategy: DistinctKeepStrategy,
+        keep_strategy: UniqueKeepStrategy,
     ) -> LazyFrame {
         let opt_state = self.get_opt_state();
         let options = DistinctOptions {

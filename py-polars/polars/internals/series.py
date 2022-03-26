@@ -23,6 +23,8 @@ try:
 except ImportError:  # pragma: no cover
     _PYARROW_AVAILABLE = False
 
+import math
+
 from polars import internals as pli
 from polars.internals.construction import (
     arrow_to_pyseries,
@@ -219,6 +221,8 @@ class Series:
             self._s = arrow_to_pyseries(name, values)
         elif isinstance(values, np.ndarray):
             self._s = numpy_to_pyseries(name, values, strict, nan_to_null)
+            if dtype is not None:
+                self._s = self.cast(dtype, strict=True)._s
         elif isinstance(values, Sequence):
             self._s = sequence_to_pyseries(name, values, dtype=dtype, strict=strict)
         elif _PANDAS_AVAILABLE and isinstance(values, (pd.Series, pd.DatetimeIndex)):
@@ -537,14 +541,11 @@ class Series:
         """
         return self.to_frame().select(pli.col(self.name).all()).to_series()
 
-    def log(self) -> "Series":
+    def log(self, base: float = math.e) -> "Series":
         """
-        Natural logarithm, element-wise.
-
-        The natural logarithm log is the inverse of the exponential function, so that log(exp(x)) = x.
-        The natural logarithm is logarithm in base e.
+        Compute the logarithm to a given base
         """
-        return np.log(self)  # type: ignore
+        return self.to_frame().select(pli.col(self.name).log(base)).to_series()
 
     def log10(self) -> "Series":
         """
@@ -898,6 +899,32 @@ class Series:
 
         """
         return pli.wrap_df(self._s.value_counts())
+
+    def unique_counts(self) -> "Series":
+        """
+        Returns a count of the unique values in the order of appearance.
+
+        Examples
+        --------
+
+        >>> s = pl.Series("id", ["a", "b", "b", "c", "c", "c"])
+        >>> s.unique_counts()
+        shape: (3,)
+        Series: 'id' [u32]
+        [
+            1
+            2
+            3
+        ]
+        """
+        return pli.select(pli.lit(self).unique_counts()).to_series()
+
+    def entropy(self, base: float = math.e) -> Optional[float]:
+        """
+        Compute the entropy as `-sum(pk * log(pk)`.
+        where `pk` are discrete probabilities.
+        """
+        return pli.select(pli.lit(self).entropy(base)).to_series()[0]
 
     @property
     def name(self) -> str:
@@ -2327,6 +2354,12 @@ class Series:
 
         """
         return wrap_s(self._s.mode())
+
+    def sign(self) -> "Series":
+        """
+        Returns an element-wise indication of the sign of a number.
+        """
+        return np.sign(self)  # type: ignore
 
     def sin(self) -> "Series":
         """

@@ -1,8 +1,10 @@
 # flake8: noqa: W191,E101
+import io
 from os import path
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 import polars as pl
 
@@ -10,6 +12,12 @@ import polars as pl
 def test_scan_csv() -> None:
     df = pl.scan_csv(Path(__file__).parent.parent / "files" / "small.csv")
     assert df.collect().shape == (4, 3)
+
+
+def test_scan_empty_csv() -> None:
+    with pytest.raises(Exception) as excinfo:
+        pl.scan_csv(Path(__file__).parent.parent / "files" / "empty.csv").collect()
+    assert str(excinfo.value) == "empty csv"
 
 
 def test_invalid_utf8() -> None:
@@ -45,3 +53,16 @@ def test_row_count(foods_csv: str) -> None:
     )
 
     assert df["foo"].to_list() == [10, 16, 21, 23, 24, 30, 35]
+
+
+def test_scan_csv_schema_overwrite_and_dtypes_overwrite(foods_csv: str) -> None:
+    assert (
+        pl.scan_csv(
+            foods_csv,
+            dtypes={"calories_foo": pl.Utf8, "fats_g_foo": pl.Float32},
+            with_column_names=lambda names: [f"{a}_foo" for a in names],
+        )
+        .collect()
+        .dtypes
+        == [pl.Utf8, pl.Utf8, pl.Float32, pl.Int64]
+    )

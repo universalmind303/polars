@@ -175,6 +175,12 @@ impl PyExpr {
     pub fn count(&self) -> PyExpr {
         self.clone().inner.count().into()
     }
+    pub fn value_counts(&self, multithreaded: bool) -> PyExpr {
+        self.inner.clone().value_counts(multithreaded).into()
+    }
+    pub fn unique_counts(&self) -> PyExpr {
+        self.inner.clone().unique_counts().into()
+    }
     pub fn cast(&self, data_type: Wrap<DataType>, strict: bool) -> PyExpr {
         let dt = data_type.0;
         let expr = if strict {
@@ -236,15 +242,23 @@ impl PyExpr {
 
     pub fn fill_null_with_strategy(&self, strategy: &str) -> PyExpr {
         let strat = parse_strategy(strategy);
-        self.clone()
-            .inner
+        self.inner
+            .clone()
             .apply(move |s| s.fill_null(strat), GetOutput::same_type())
             .with_fmt("fill_null")
             .into()
     }
 
     pub fn fill_nan(&self, expr: PyExpr) -> PyExpr {
-        self.clone().inner.fill_nan(expr.inner).into()
+        self.inner.clone().fill_nan(expr.inner).into()
+    }
+
+    pub fn drop_nulls(&self) -> PyExpr {
+        self.inner.clone().drop_nulls().into()
+    }
+
+    pub fn drop_nans(&self) -> PyExpr {
+        self.inner.clone().drop_nans().into()
     }
 
     pub fn filter(&self, predicate: PyExpr) -> PyExpr {
@@ -1276,6 +1290,14 @@ impl PyExpr {
 
     pub fn struct_rename_fields(&self, names: Vec<String>) -> PyExpr {
         self.inner.clone().struct_().rename_fields(names).into()
+    }
+
+    pub fn log(&self, base: f64) -> Self {
+        self.inner.clone().log(base).into()
+    }
+
+    pub fn entropy(&self, base: f64) -> Self {
+        self.inner.clone().entropy(base).into()
     }
 }
 

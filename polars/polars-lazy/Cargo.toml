@@ -26,9 +26,9 @@ dtype-u8 = ["polars-core/dtype-u8"]
 dtype-u16 = ["polars-core/dtype-u16"]
 dtype-i8 = ["polars-core/dtype-i8"]
 dtype-i16 = ["polars-core/dtype-i16"]
-dtype-date = ["polars-core/dtype-date"]
-dtype-datetime = ["polars-core/dtype-datetime"]
-dtype-duration = ["polars-core/dtype-duration"]
+dtype-date = ["polars-core/dtype-date", "polars-time/dtype-date"]
+dtype-datetime = ["polars-core/dtype-datetime", "polars-time/dtype-datetime"]
+dtype-duration = ["polars-core/dtype-duration", "polars-time/dtype-duration"]
 dtype-categorical = ["polars-core/dtype-categorical"]
 dtype-struct = ["polars-core/dtype-struct"]
 object = ["polars-core/object"]
@@ -61,6 +61,8 @@ random = ["polars-core/random"]
 dynamic_groupby = ["polars-core/dynamic_groupby"]
 ewma = ["polars-core/ewma"]
 dot_diagram = []
+unique_counts = ["polars-core/unique_counts"]
+log = ["polars-core/log"]
 
 # no guarantees whatsoever
 private = ["polars-time/private"]
@@ -85,6 +87,7 @@ test = [
   "abs",
   "parquet",
   "ipc",
+  "dtype-date",
 ]
 
 [dependencies]

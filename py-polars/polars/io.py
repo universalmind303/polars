@@ -268,7 +268,7 @@ def read_csv(
     projection, columns = handle_projection_columns(columns)
 
     if isinstance(file, bytes) and len(file) == 0:
-        raise ValueError("no date in bytes")
+        raise ValueError("Empty bytes data provided")
 
     storage_options = storage_options or {}
 
@@ -442,6 +442,7 @@ def scan_csv(
     skip_rows_after_header: int = 0,
     row_count_name: Optional[str] = None,
     row_count_offset: int = 0,
+    parse_dates: bool = False,
     **kwargs: Any,
 ) -> LazyFrame:
     """
@@ -508,6 +509,9 @@ def scan_csv(
         If not None, this will insert a row count column with give name into the DataFrame
     row_count_offset
         Offset to start the row_count column (only use if the name is set)
+    parse_dates
+        Try to automatically parse dates. If this does not succeed,
+        the column remains of data type ``pl.Utf8``.
 
     Examples
     --------
@@ -577,6 +581,7 @@ def scan_csv(
         encoding=encoding,
         row_count_name=row_count_name,
         row_count_offset=row_count_offset,
+        parse_dates=parse_dates,
     )
 
 

@@ -13,6 +13,8 @@ try:
 except ImportError:  # pragma: no cover
     _DOCUMENTING = True
 
+import math
+
 from polars import internals as pli
 from polars.datatypes import (
     DataType,
@@ -232,20 +234,11 @@ class Expr:
         """
         return self ** 0.5
 
-    def log(self) -> "Expr":
-        """
-        Natural logarithm, element-wise.
-
-        The natural logarithm log is the inverse of the exponential function, so that log(exp(x)) = x.
-        The natural logarithm is logarithm in base e.
-        """
-        return np.log(self)  # type: ignore
-
     def log10(self) -> "Expr":
         """
         Return the base 10 logarithm of the input array, element-wise.
         """
-        return np.log10(self)  # type: ignore
+        return self.log(10.0)
 
     def exp(self) -> "Expr":
         """
@@ -762,21 +755,15 @@ class Expr:
 
     def drop_nulls(self) -> "Expr":
         """
-        Syntactic sugar for:
-
-        >>> pl.col("foo").filter(pl.col("foo").is_not_null())  # doctest: +IGNORE_RESULT
-
+        Drop null values
         """
-        return self.filter(self.is_not_null())
+        return wrap_expr(self._pyexpr.drop_nulls())
 
     def drop_nans(self) -> "Expr":
         """
-        Syntactic sugar for:
-
-        >>> pl.col("foo").filter(pl.col("foo").is_not_nan())  # doctest: +IGNORE_RESULT
-
+        Drop floating point NaN values
         """
-        return self.filter(self.is_not_nan())
+        return wrap_expr(self._pyexpr.drop_nans())
 
     def cumsum(self, reverse: bool = False) -> "Expr":
         """
@@ -976,6 +963,28 @@ class Expr:
         -------
         out
             Series of type UInt32
+
+        Examples
+        --------
+
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "a": [20, 10, 30],
+        ...     }
+        ... )
+        >>> df.select(pl.col("a").arg_sort())
+        shape: (3, 1)
+        ┌─────┐
+        │ a   │
+        │ --- │
+        │ u32 │
+        ╞═════╡
+        │ 1   │
+        ├╌╌╌╌╌┤
+        │ 0   │
+        ├╌╌╌╌╌┤
+        │ 2   │
+        └─────┘
         """
         return wrap_expr(self._pyexpr.arg_sort(reverse))
 
@@ -2217,37 +2226,9 @@ class Expr:
 
     def argsort(self, reverse: bool = False) -> "Expr":
         """
-        Index location of the sorted variant of this Series.
-
-        Parameters
-        ----------
-        reverse
-            Reverse the ordering. Default is from low to high.
-
-        Examples
-        --------
-
-        >>> df = pl.DataFrame(
-        ...     {
-        ...         "a": [20, 10, 30],
-        ...     }
-        ... )
-        >>> df.select(pl.col("a").arg_sort())
-        shape: (3, 1)
-        ┌─────┐
-        │ a   │
-        │ --- │
-        │ u32 │
-        ╞═════╡
-        │ 1   │
-        ├╌╌╌╌╌┤
-        │ 0   │
-        ├╌╌╌╌╌┤
-        │ 2   │
-        └─────┘
-
+        alias for `arg_sort`
         """
-        return pli.argsort_by([self], [reverse])
+        return self.arg_sort(reverse)
 
     def rank(self, method: str = "average", reverse: bool = False) -> "Expr":
         """
@@ -2464,6 +2445,12 @@ class Expr:
         Returns a unit Series with the highest value possible for the dtype of this expression.
         """
         return wrap_expr(self._pyexpr.upper_bound())
+
+    def sign(self) -> "Expr":
+        """
+        Returns an element-wise indication of the sign of a number.
+        """
+        return np.sign(self)  # type: ignore
 
     def sin(self) -> "Expr":
         """
@@ -2797,6 +2784,107 @@ class Expr:
 
         """
         return wrap_expr(self._pyexpr.extend_constant(value, n))
+
+    def value_counts(self, multithreaded: bool = False) -> "Expr":
+        """
+        Count all unique values and create a struct mapping value to count
+
+        Parameters
+        ----------
+        multithreaded:
+            Better to turn this off in the aggregation context, as it can lead to contention.
+
+        Returns
+        -------
+        Dtype Struct
+
+        Examples
+        --------
+
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "id": ["a", "b", "b", "c", "c", "c"],
+        ...     }
+        ... )
+        >>> df.select(
+        ...     [
+        ...         pl.col("id").value_counts(),
+        ...     ]
+        ... )
+        shape: (3, 1)
+        ┌─────────────────────────────────────┐
+        │ id                                  │
+        │ ---                                 │
+        │ struct[2]{'id': str, 'counts': u32} │
+        ╞═════════════════════════════════════╡
+        │ {"c",3}                             │
+        ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+        │ {"b",2}                             │
+        ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+        │ {"a",1}                             │
+        └─────────────────────────────────────┘
+
+        """
+        return wrap_expr(self._pyexpr.value_counts(multithreaded))
+
+    def unique_counts(self) -> "Expr":
+        """
+        Returns a count of the unique values in the order of appearance.
+
+        This method differs from `value_counts` in that it does not return the
+        values, only the counts and might be faster
+
+        Examples
+        --------
+
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "id": ["a", "b", "b", "c", "c", "c"],
+        ...     }
+        ... )
+        >>> df.select(
+        ...     [
+        ...         pl.col("id").unique_counts(),
+        ...     ]
+        ... )
+        shape: (3, 1)
+        ┌─────┐
+        │ id  │
+        │ --- │
+        │ u32 │
+        ╞═════╡
+        │ 1   │
+        ├╌╌╌╌╌┤
+        │ 2   │
+        ├╌╌╌╌╌┤
+        │ 3   │
+        └─────┘
+
+        """
+        return wrap_expr(self._pyexpr.unique_counts())
+
+    def log(self, base: float = math.e) -> "Expr":
+        """
+        Compute the logarithm to a given base
+
+        Parameters
+        ----------
+        base
+            Given base, defaults to `e`
+        """
+        return wrap_expr(self._pyexpr.log(base))
+
+    def entropy(self, base: float = math.e) -> "Expr":
+        """
+        Compute the entropy as `-sum(pk * log(pk)`.
+        where `pk` are discrete probabilities.
+
+        Parameters
+        ----------
+        base
+            Given base, defaults to `e`
+        """
+        return wrap_expr(self._pyexpr.entropy(base))
 
     # Below are the namespaces defined. Keep these at the end of the definition of Expr, as to not confuse mypy with
     # the type annotation `str` with the namespace "str"

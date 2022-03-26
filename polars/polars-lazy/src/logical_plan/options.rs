@@ -19,6 +19,7 @@ pub struct CsvParserOptions {
     pub(crate) rechunk: bool,
     pub(crate) encoding: CsvEncoding,
     pub(crate) row_count: Option<RowCount>,
+    pub(crate) parse_dates: bool,
 }
 #[cfg(feature = "parquet")]
 #[derive(Clone, Debug)]
@@ -55,17 +56,20 @@ pub struct GroupbyOptions {
 pub struct DistinctOptions {
     pub(crate) subset: Option<Arc<Vec<String>>>,
     pub(crate) maintain_order: bool,
-    pub(crate) keep_strategy: DistinctKeepStrategy,
+    pub(crate) keep_strategy: UniqueKeepStrategy,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ApplyOptions {
     /// Collect groups to a list and apply the function over the groups.
     /// This can be important in aggregation context.
+    // e.g. [g1, g1, g2] -> [[g1, g2], g2]
     ApplyGroups,
     // collect groups to a list and then apply
+    // e.g. [g1, g1, g2] -> list([g1, g1, g2])
     ApplyList,
     // do not collect before apply
+    // e.g. [g1, g1, g2] -> [g1, g1, g2]
     ApplyFlat,
 }
 

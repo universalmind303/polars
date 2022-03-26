@@ -132,7 +132,7 @@ impl PhysicalExpr for BinaryExpr {
                 if s.len() != df.height() =>
             {
                 // this is a flat series of len eq to group tuples
-                let l = ac_l.aggregated();
+                let l = ac_l.aggregated_arity_operation();
                 let l = l.as_ref();
                 let arr_l = &l.chunks()[0];
 
@@ -145,7 +145,7 @@ impl PhysicalExpr for BinaryExpr {
                 let mut us = UnstableSeries::new(&dummy);
 
                 // this is now a list
-                let r = ac_r.aggregated();
+                let r = ac_r.aggregated_arity_operation();
                 let r = r.list().unwrap();
 
                 let mut ca: ListChunked = r
@@ -155,7 +155,7 @@ impl PhysicalExpr for BinaryExpr {
                         opt_s
                             .map(|s| {
                                 let r = s.as_ref();
-                                // TODO: optimize this? Its slow and unsafe.
+                                // TODO: optimize this?
 
                                 // Safety:
                                 // we are in bounds
@@ -182,11 +182,11 @@ impl PhysicalExpr for BinaryExpr {
                 _,
             ) if s.len() != df.height() => {
                 // this is now a list
-                let l = ac_l.aggregated();
+                let l = ac_l.aggregated_arity_operation();
                 let l = l.list().unwrap();
 
                 // this is a flat series of len eq to group tuples
-                let r = ac_r.aggregated();
+                let r = ac_r.aggregated_arity_operation();
                 assert_eq!(l.len(), groups.len());
                 let r = r.as_ref();
                 let arr_r = &r.chunks()[0];
@@ -221,7 +221,14 @@ impl PhysicalExpr for BinaryExpr {
                 ca.rename(l.name());
 
                 ac_l.with_series(ca.into_series(), true);
-                ac_l.with_update_groups(UpdateGroups::WithGroupsLen);
+                // Todo! maybe always update with groups len here?
+                if matches!(ac_l.update_groups, UpdateGroups::WithSeriesLen)
+                    || matches!(ac_r.update_groups, UpdateGroups::WithSeriesLen)
+                {
+                    ac_l.with_update_groups(UpdateGroups::WithSeriesLen);
+                } else {
+                    ac_l.with_update_groups(UpdateGroups::WithGroupsLen);
+                }
                 Ok(ac_l)
             }
             (AggState::AggregatedList(_), AggState::NotAggregated(_) | AggState::Literal(_), _)
@@ -288,29 +295,9 @@ impl PhysicalAggregation for BinaryExpr {
         groups: &GroupsProxy,
         state: &ExecutionState,
     ) -> Result<Option<Series>> {
-        match (self.left.as_agg_expr(), self.right.as_agg_expr()) {
-            (Ok(left), Ok(right)) => {
-                let (left_agg, right_agg) = POOL.install(|| {
-                    rayon::join(
-                        || left.aggregate(df, groups, state),
-                        || right.aggregate(df, groups, state),
-                    )
-                });
-                let right_agg = right_agg?;
-                left_agg?
-                    .and_then(|left| right_agg.map(|right| apply_operator(&left, &right, self.op)))
-                    .transpose()
-            }
-            (_, _) => Err(PolarsError::ComputeError(
-                format!(
-                    "this binary expression is not an aggregation: {:?}
-                pherhaps you should add an aggregation like, '.sum()', '.min()', '.mean()', etc.
-                if you really want to collect this binary expression, use `.list()`",
-                    self.expr
-                )
-                .into(),
-            )),
-        }
+        let mut ac = self.evaluate_on_groups(df, groups, state)?;
+        let s = ac.aggregated_arity_operation();
+        Ok(Some(s))
     }
 }
 

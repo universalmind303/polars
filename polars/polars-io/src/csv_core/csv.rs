@@ -9,6 +9,7 @@ use crate::RowCount;
 use polars_arrow::array::*;
 use polars_core::utils::accumulate_dataframes_vertical;
 use polars_core::{prelude::*, POOL};
+use polars_time::prelude::*;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
 use std::borrow::Cow;
@@ -167,6 +168,7 @@ impl<'a> CoreReader<'a> {
         to_cast: &'a [Field],
         skip_rows_after_header: usize,
         row_count: Option<RowCount>,
+        parse_dates: bool,
     ) -> Result<CoreReader<'a>> {
         #[cfg(any(feature = "decompress", feature = "decompress-fast"))]
         let mut reader_bytes = reader_bytes;
@@ -201,6 +203,7 @@ impl<'a> CoreReader<'a> {
                         comment_char,
                         quote_char,
                         null_values.as_ref(),
+                        parse_dates,
                     )?;
                     Cow::Owned(inferred_schema)
                 }
@@ -216,6 +219,7 @@ impl<'a> CoreReader<'a> {
                         comment_char,
                         quote_char,
                         null_values.as_ref(),
+                        parse_dates,
                     )?;
                     Cow::Owned(inferred_schema)
                 }

@@ -101,6 +101,8 @@ ewma = ["polars-core/ewma", "polars-lazy/ewma"]
 dot_diagram = ["polars-lazy/dot_diagram"]
 dataframe_arithmetic = ["polars-core/dataframe_arithmetic"]
 product = ["polars-core/product"]
+unique_counts = ["polars-core/unique_counts", "polars-lazy/unique_counts"]
+log = ["polars-core/log", "polars-lazy/log"]
 
 series_from_anyvalue = ["polars-core/series_from_anyvalue"]
 
@@ -153,8 +155,8 @@ dtype-datetime = [
   "polars-io/dtype-datetime",
   "polars-time/dtype-datetime",
 ]
-dtype-duration = ["polars-core/dtype-duration", "polars-lazy/dtype-duration"]
-dtype-time = ["polars-core/dtype-time", "polars-io/dtype-time"]
+dtype-duration = ["polars-core/dtype-duration", "polars-lazy/dtype-duration", "polars-time/dtype-duration"]
+dtype-time = ["polars-core/dtype-time", "polars-io/dtype-time", "polars-time/dtype-time"]
 dtype-i8 = ["polars-core/dtype-i8", "polars-lazy/dtype-i8"]
 dtype-i16 = ["polars-core/dtype-i16", "polars-lazy/dtype-i16"]
 dtype-u8 = ["polars-core/dtype-u8", "polars-lazy/dtype-u8"]
