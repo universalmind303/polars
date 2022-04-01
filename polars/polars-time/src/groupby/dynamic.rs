@@ -3,7 +3,6 @@ use polars_arrow::utils::CustomIterTools;
 use polars_core::export::rayon::prelude::*;
 use polars_core::frame::groupby::GroupsProxy;
 use polars_core::prelude::*;
-use polars_core::POOL;
 
 #[repr(transparent)]
 struct Wrap<T>(pub T);
@@ -258,24 +257,22 @@ impl Wrap<&DataFrame> {
                     .collect();
                 GroupsProxy::Idx(groupsidx)
             } else {
-                let groupsidx = POOL.install(|| {
-                    groups
-                        .par_iter()
-                        .flat_map(|base_g| {
-                            let dt = unsafe { dt.take_unchecked(base_g.1.into()) };
-                            let vals = dt.downcast_iter().next().unwrap();
-                            let ts = vals.values().as_slice();
-                            let (sub_groups, _, _) = groupby_windows(
-                                w,
-                                ts,
-                                options.include_boundaries,
-                                options.closed_window,
-                                tu,
-                            );
-                            update_subgroups(&sub_groups, base_g)
-                        })
-                        .collect()
-                });
+                let groupsidx = groups
+                    .par_iter()
+                    .flat_map(|base_g| {
+                        let dt = unsafe { dt.take_unchecked(base_g.1.into()) };
+                        let vals = dt.downcast_iter().next().unwrap();
+                        let ts = vals.values().as_slice();
+                        let (sub_groups, _, _) = groupby_windows(
+                            w,
+                            ts,
+                            options.include_boundaries,
+                            options.closed_window,
+                            tu,
+                        );
+                        update_subgroups(&sub_groups, base_g)
+                    })
+                    .collect();
                 GroupsProxy::Idx(groupsidx)
             }
         };
@@ -344,25 +341,23 @@ impl Wrap<&DataFrame> {
                 .take_groups();
             let groups = groups.into_idx();
 
-            let groupsidx = POOL.install(|| {
-                groups
-                    .par_iter()
-                    .flat_map(|base_g| {
-                        let dt = unsafe { dt.take_unchecked(base_g.1.into()) };
-                        let vals = dt.downcast_iter().next().unwrap();
-                        let ts = vals.values().as_slice();
-                        let sub_groups = groupby_values(
-                            options.period,
-                            options.offset,
-                            ts,
-                            options.closed_window,
-                            tu,
-                        );
+            let groupsidx = groups
+                .par_iter()
+                .flat_map(|base_g| {
+                    let dt = unsafe { dt.take_unchecked(base_g.1.into()) };
+                    let vals = dt.downcast_iter().next().unwrap();
+                    let ts = vals.values().as_slice();
+                    let sub_groups = groupby_values(
+                        options.period,
+                        options.offset,
+                        ts,
+                        options.closed_window,
+                        tu,
+                    );
 
-                        update_subgroups(&sub_groups, base_g)
-                    })
-                    .collect()
-            });
+                    update_subgroups(&sub_groups, base_g)
+                })
+                .collect();
             GroupsProxy::Idx(groupsidx)
         };
 
