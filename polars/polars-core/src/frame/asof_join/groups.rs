@@ -242,7 +242,7 @@ where
     let right_asof = right_asof.rechunk();
     let right_asof = right_asof.cont_slice().unwrap();
 
-    let n_threads = 1 as usize;
+    let n_threads = 8 as usize;
     let splitted_left = split_ca(by_left, n_threads).unwrap();
     let splitted_right = split_ca(by_right, n_threads).unwrap();
 
@@ -353,7 +353,7 @@ where
     let right_asof = right_asof.rechunk();
     let right_asof = right_asof.cont_slice().unwrap();
 
-    let n_threads = 1 as usize;
+    let n_threads = 8 as usize;
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 
@@ -375,7 +375,7 @@ where
         .map(|(probe_hashes, offset)| {
             // local reference
             let hash_tbls = &hash_tbls;
-            let mut results = Vec::with_capacity(probe_hashes.len() / 1 as usize);
+            let mut results = Vec::with_capacity(probe_hashes.len() / 8 as usize);
             let local_offset = offset;
 
             let mut idx_a = local_offset as IdxSize;

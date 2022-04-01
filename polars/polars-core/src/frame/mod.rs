@@ -1374,7 +1374,7 @@ impl DataFrame {
     /// Does a filter but splits thread chunks vertically instead of horizontally
     /// This yields a DataFrame with `n_chunks == n_threads`.
     fn filter_vertical(&self, mask: &BooleanChunked) -> Result<Self> {
-        let n_threads = 1 as usize;
+        let n_threads = 8 as usize;
 
         let masks = split_ca(mask, n_threads).unwrap();
         let dfs = split_df(self, n_threads).unwrap();
@@ -1601,7 +1601,7 @@ impl DataFrame {
     }
 
     unsafe fn take_unchecked_vectical(&self, indices: &IdxCa) -> Self {
-        let n_threads = 1 as usize;
+        let n_threads = 8 as usize;
         let idxs = split_ca(indices, n_threads).unwrap();
 
         let dfs: Vec<_> = idxs
@@ -2892,7 +2892,7 @@ impl DataFrame {
     /// Hash and combine the row values
     #[cfg(feature = "row_hash")]
     pub fn hash_rows(&self, hasher_builder: Option<RandomState>) -> Result<UInt64Chunked> {
-        let dfs = split_df(self, 1 as usize)?;
+        let dfs = split_df(self, 8 as usize)?;
         let (cas, _) = df_rows_to_hashes_threaded(&dfs, hasher_builder);
 
         let mut iter = cas.into_iter();

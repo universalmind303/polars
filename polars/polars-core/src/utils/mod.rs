@@ -23,7 +23,7 @@ impl<T> Deref for Wrap<T> {
 }
 
 pub(crate) fn set_partition_size() -> usize {
-    let mut n_partitions = 1 as usize;
+    let mut n_partitions = 8 as usize;
     // set n_partitions to closes 2^n above the no of threads.
     loop {
         if n_partitions.is_power_of_two() {
