@@ -9,6 +9,8 @@ use crate::RowCount;
 use polars_arrow::array::*;
 use polars_core::utils::accumulate_dataframes_vertical;
 use polars_core::{prelude::*, POOL};
+#[cfg(feature = "multi-threaded")]
+use polars_core::POOL;
 use polars_time::prelude::*;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
@@ -139,7 +141,7 @@ impl RunningSize {
         compute_size_hint(max, sum, count, last)
     }
 }
-
+#[cfg(feature = "multi-threaded")]
 impl<'a> CoreReader<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
