@@ -4,7 +4,6 @@ use rayon::prelude::*;
 use std::cmp::Ordering;
 
 use crate::frame::groupby::{GroupsIndicator, GroupsProxy};
-use crate::POOL;
 #[cfg(feature = "dtype-date")]
 use arrow::temporal_conversions::date32_to_date;
 use arrow::temporal_conversions::timestamp_us_to_datetime;

@@ -5,7 +5,6 @@ use crate::prelude::*;
 use crate::utils::CustomIterTools;
 use crate::vector_hasher::{df_rows_to_hashes_threaded, IdBuildHasher, IdxHash};
 use crate::vector_hasher::{this_partition, AsU64};
-use crate::POOL;
 use crate::{datatypes::PlHashMap, utils::split_df};
 use ahash::CallHasher;
 use hashbrown::hash_map::Entry;
@@ -287,43 +286,42 @@ pub(crate) fn groupby_threaded_multiple_keys_flat(
     // We will create a hashtable in every thread.
     // We use the hash to partition the keys to the matching hashtable.
     // Every thread traverses all keys/hashes and ignores the ones that doesn't fall in that partition.
-    let groups = POOL
-        .install(|| {
-            (0..n_partitions).into_par_iter().map(|thread_no| {
-                let hashes = &hashes;
-                let thread_no = thread_no as u64;
+    let groups = (0..n_partitions)
+        .into_par_iter()
+        .map(|thread_no| {
+            let hashes = &hashes;
+            let thread_no = thread_no as u64;
 
-                let mut hash_tbl: HashMap<IdxHash, (IdxSize, Vec<IdxSize>), IdBuildHasher> =
-                    HashMap::with_capacity_and_hasher(HASHMAP_INIT_SIZE, Default::default());
+            let mut hash_tbl: HashMap<IdxHash, (IdxSize, Vec<IdxSize>), IdBuildHasher> =
+                HashMap::with_capacity_and_hasher(HASHMAP_INIT_SIZE, Default::default());
 
-                let mut offset = 0;
-                for hashes in hashes {
-                    let len = hashes.len() as IdxSize;
+            let mut offset = 0;
+            for hashes in hashes {
+                let len = hashes.len() as IdxSize;
 
-                    let mut idx = 0;
-                    for hashes_chunk in hashes.data_views() {
-                        for &h in hashes_chunk {
-                            // partition hashes by thread no.
-                            // So only a part of the hashes go to this hashmap
-                            if this_partition(h, thread_no, n_partitions) {
-                                let idx = idx + offset;
-                                populate_multiple_key_hashmap2(
-                                    &mut hash_tbl,
-                                    idx,
-                                    h,
-                                    &keys_cmp,
-                                    || (idx, vec![idx]),
-                                    |v| v.1.push(idx),
-                                );
-                            }
-                            idx += 1;
+                let mut idx = 0;
+                for hashes_chunk in hashes.data_views() {
+                    for &h in hashes_chunk {
+                        // partition hashes by thread no.
+                        // So only a part of the hashes go to this hashmap
+                        if this_partition(h, thread_no, n_partitions) {
+                            let idx = idx + offset;
+                            populate_multiple_key_hashmap2(
+                                &mut hash_tbl,
+                                idx,
+                                h,
+                                &keys_cmp,
+                                || (idx, vec![idx]),
+                                |v| v.1.push(idx),
+                            );
                         }
+                        idx += 1;
                     }
-
-                    offset += len;
                 }
-                hash_tbl.into_iter().map(|(_k, v)| v).collect::<Vec<_>>()
-            })
+
+                offset += len;
+            }
+            hash_tbl.into_iter().map(|(_k, v)| v).collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
     finish_group_order(groups, sorted)

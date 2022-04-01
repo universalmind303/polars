@@ -6,7 +6,6 @@ use crate::utils::{
     accumulate_dataframes_vertical, copy_from_slice_unchecked, set_partition_size, split_offsets,
 };
 use crate::vector_hasher::{get_null_hash_value, AsU64, StrHash};
-use crate::POOL;
 use ahash::{CallHasher, RandomState};
 use hashbrown::HashMap;
 use num::NumCast;
@@ -299,20 +298,18 @@ impl<'df> GroupBy<'df> {
     }
 
     pub fn keys(&self) -> Vec<Series> {
-        POOL.install(|| {
-            self.selected_keys
-                .par_iter()
-                .map(|s| {
-                    // Safety
-                    // groupby indexes are in bound.
-                    unsafe {
-                        s.take_iter_unchecked(
-                            &mut self.groups.idx_ref().iter().map(|(idx, _)| idx as usize),
-                        )
-                    }
-                })
-                .collect()
-        })
+        self.selected_keys
+            .par_iter()
+            .map(|s| {
+                // Safety
+                // groupby indexes are in bound.
+                unsafe {
+                    s.take_iter_unchecked(
+                        &mut self.groups.idx_ref().iter().map(|(idx, _)| idx as usize),
+                    )
+                }
+            })
+            .collect()
     }
 
     fn prepare_agg(&self) -> Result<(Vec<Series>, Vec<Series>)> {

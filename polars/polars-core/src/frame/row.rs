@@ -1,7 +1,6 @@
 use crate::chunked_array::builder::get_list_builder;
 use crate::prelude::*;
 use crate::utils::get_supertype;
-use crate::POOL;
 
 use arrow::bitmap::Bitmap;
 use rayon::prelude::*;
@@ -470,75 +469,71 @@ where
         (0..new_width).map(|_| vec![]).collect()
     };
 
-    POOL.install(|| {
-        cols.iter().enumerate().for_each(|(row_idx, s)| {
-            let s = s.cast(&T::get_dtype()).unwrap();
-            let ca = s.unpack::<T>().unwrap();
+    cols.iter().enumerate().for_each(|(row_idx, s)| {
+        let s = s.cast(&T::get_dtype()).unwrap();
+        let ca = s.unpack::<T>().unwrap();
 
-            // Safety
-            // we access in parallel, but every access is unique, so we don't break aliasing rules
-            // we also ensured we allocated enough memory, so we never reallocate and thus
-            // the pointers remain valid.
-            if has_nulls {
-                for (col_idx, opt_v) in ca.into_iter().enumerate() {
-                    match opt_v {
-                        None => unsafe {
-                            let column = validity_buf.get_unchecked(col_idx);
-                            let el_ptr = column.as_ptr() as *mut bool;
-                            *el_ptr.add(row_idx) = false;
-                        },
-                        Some(v) => unsafe {
-                            let column = values_buf.get_unchecked(col_idx);
-                            let el_ptr = column.as_ptr() as *mut T::Native;
-                            *el_ptr.add(row_idx) = v;
-                        },
-                    }
-                }
-            } else {
-                for (col_idx, v) in ca.into_no_null_iter().enumerate() {
-                    unsafe {
-                        let column = values_buf.get(col_idx).unwrap();
+        // Safety
+        // we access in parallel, but every access is unique, so we don't break aliasing rules
+        // we also ensured we allocated enough memory, so we never reallocate and thus
+        // the pointers remain valid.
+        if has_nulls {
+            for (col_idx, opt_v) in ca.into_iter().enumerate() {
+                match opt_v {
+                    None => unsafe {
+                        let column = validity_buf.get_unchecked(col_idx);
+                        let el_ptr = column.as_ptr() as *mut bool;
+                        *el_ptr.add(row_idx) = false;
+                    },
+                    Some(v) => unsafe {
+                        let column = values_buf.get_unchecked(col_idx);
                         let el_ptr = column.as_ptr() as *mut T::Native;
                         *el_ptr.add(row_idx) = v;
-                    }
+                    },
                 }
             }
-        })
+        } else {
+            for (col_idx, v) in ca.into_no_null_iter().enumerate() {
+                unsafe {
+                    let column = values_buf.get(col_idx).unwrap();
+                    let el_ptr = column.as_ptr() as *mut T::Native;
+                    *el_ptr.add(row_idx) = v;
+                }
+            }
+        }
     });
 
-    let series = POOL.install(|| {
-        values_buf
-            .into_par_iter()
-            .zip(validity_buf)
-            .enumerate()
-            .map(|(i, (mut values, validity))| {
-                // Safety:
-                // all values are written we can now set len
-                unsafe {
-                    values.set_len(new_height);
-                }
+    let series = values_buf
+        .into_par_iter()
+        .zip(validity_buf)
+        .enumerate()
+        .map(|(i, (mut values, validity))| {
+            // Safety:
+            // all values are written we can now set len
+            unsafe {
+                values.set_len(new_height);
+            }
 
-                let validity = if has_nulls {
-                    let validity = Bitmap::from_trusted_len_iter(validity.iter().copied());
-                    if validity.null_count() > 0 {
-                        Some(validity)
-                    } else {
-                        None
-                    }
+            let validity = if has_nulls {
+                let validity = Bitmap::from_trusted_len_iter(validity.iter().copied());
+                if validity.null_count() > 0 {
+                    Some(validity)
                 } else {
                     None
-                };
+                }
+            } else {
+                None
+            };
 
-                let arr = PrimitiveArray::<T::Native>::from_data(
-                    T::get_dtype().to_arrow(),
-                    values.into(),
-                    validity,
-                );
-                let name = format!("column_{}", i);
-                ChunkedArray::<T>::from_chunks(&name, vec![Arc::new(arr) as ArrayRef]).into_series()
-            })
-            .collect()
-    });
+            let arr = PrimitiveArray::<T::Native>::from_data(
+                T::get_dtype().to_arrow(),
+                values.into(),
+                validity,
+            );
+            let name = format!("column_{}", i);
+            ChunkedArray::<T>::from_chunks(&name, vec![Arc::new(arr) as ArrayRef]).into_series()
+        })
+        .collect();
 
     Ok(DataFrame::new_no_checks(series))
 }

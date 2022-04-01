@@ -22,9 +22,9 @@ pub mod unstable;
 use crate::chunked_array::ops::rolling_window::RollingOptions;
 #[cfg(feature = "rank")]
 use crate::prelude::unique::rank::rank;
+use crate::series::arithmetic::coerce_lhs_rhs;
 use crate::utils::Wrap;
 use crate::utils::{split_ca, split_series};
-use crate::{series::arithmetic::coerce_lhs_rhs, POOL};
 use ahash::RandomState;
 pub use from::*;
 use num::NumCast;
@@ -371,11 +371,10 @@ impl Series {
     /// # Safety
     /// This doesn't check any bounds. Null validity is checked.
     pub unsafe fn take_unchecked_threaded(&self, idx: &IdxCa, rechunk: bool) -> Result<Series> {
-        let n_threads = POOL.current_num_threads();
+        let n_threads = 1 as usize;
         let idx = split_ca(idx, n_threads)?;
 
-        let series: Result<Vec<_>> =
-            POOL.install(|| idx.par_iter().map(|idx| self.take_unchecked(idx)).collect());
+        let series: Result<Vec<_>> = idx.par_iter().map(|idx| self.take_unchecked(idx)).collect();
 
         let s = series?
             .into_iter()
@@ -397,14 +396,13 @@ impl Series {
     ///
     /// Out of bounds access doesn't Error but will return a Null value
     pub fn take_threaded(&self, idx: &IdxCa, rechunk: bool) -> Result<Series> {
-        let n_threads = POOL.current_num_threads();
+        let n_threads = 1 as usize;
         let idx = split_ca(idx, n_threads).unwrap();
 
-        let series = POOL.install(|| {
-            idx.par_iter()
-                .map(|idx| self.take(idx))
-                .collect::<Result<Vec<_>>>()
-        })?;
+        let series = idx
+            .par_iter()
+            .map(|idx| self.take(idx))
+            .collect::<Result<Vec<_>>>()?;
 
         let s = series
             .into_iter()
@@ -428,17 +426,15 @@ impl Series {
         if filter.len() == 1 {
             return self.filter(filter);
         }
-        let n_threads = POOL.current_num_threads();
+        let n_threads = 1 as usize;
         let filters = split_ca(filter, n_threads).unwrap();
         let series = split_series(self, n_threads).unwrap();
 
-        let series: Result<Vec<_>> = POOL.install(|| {
-            filters
-                .par_iter()
-                .zip(series)
-                .map(|(filter, s)| s.filter(filter))
-                .collect()
-        });
+        let series: Result<Vec<_>> = filters
+            .par_iter()
+            .zip(series)
+            .map(|(filter, s)| s.filter(filter))
+            .collect();
 
         let s = series?
             .into_iter()

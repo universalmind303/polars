@@ -117,29 +117,27 @@ impl IntoGroupsProxy for Utf8Chunked {
 
             let split = split_offsets(self.len(), n_partitions);
 
-            let str_hashes = POOL.install(|| {
-                split
-                    .into_par_iter()
-                    .map(|(offset, len)| {
-                        let ca = self.slice(offset as i64, len);
-                        ca.into_iter()
-                            .map(|opt_s| {
-                                let hash = match opt_s {
-                                    Some(s) => str::get_hash(s, &hb),
-                                    None => null_h,
-                                };
-                                // Safety:
-                                // the underlying data is tied to self
-                                unsafe {
-                                    std::mem::transmute::<StrHash<'_>, StrHash<'a>>(StrHash::new(
-                                        opt_s, hash,
-                                    ))
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .collect::<Vec<_>>()
-            });
+            let str_hashes = split
+                .into_par_iter()
+                .map(|(offset, len)| {
+                    let ca = self.slice(offset as i64, len);
+                    ca.into_iter()
+                        .map(|opt_s| {
+                            let hash = match opt_s {
+                                Some(s) => str::get_hash(s, &hb),
+                                None => null_h,
+                            };
+                            // Safety:
+                            // the underlying data is tied to self
+                            unsafe {
+                                std::mem::transmute::<StrHash<'_>, StrHash<'a>>(StrHash::new(
+                                    opt_s, hash,
+                                ))
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
             groupby_threaded_num(str_hashes, 0, n_partitions as u64, sorted)
         } else {
             let str_hashes = self

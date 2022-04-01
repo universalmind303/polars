@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::utils::NoNull;
-use crate::POOL;
 use polars_arrow::utils::CustomIterTools;
 use rayon::iter::plumbing::UnindexedConsumer;
 use rayon::prelude::*;
@@ -67,7 +66,7 @@ impl GroupsIdx {
                 })
                 .collect_trusted::<Vec<_>>()
         };
-        let (first, all) = POOL.install(|| rayon::join(take_first, take_all));
+        let (first, all) = rayon::join(take_first, take_all);
         self.first = first;
         self.all = all;
         self.sorted = true

@@ -119,7 +119,7 @@ where
     T::Native: Hash + Eq + Send + AsU64 + Copy,
     Option<T::Native>: AsU64,
 {
-    let n_threads = POOL.current_num_threads();
+    let n_threads = 1 as usize;
     let (a, b, swap) = det_hash_prone_order!(left, right);
     let splitted_a = split_ca(a, n_threads).unwrap();
     let splitted_b = split_ca(b, n_threads).unwrap();
@@ -194,7 +194,7 @@ where
     T::Native: Hash + Eq + Send + AsU64,
     Option<T::Native>: AsU64,
 {
-    let n_threads = POOL.current_num_threads();
+    let n_threads = 1 as usize;
     let splitted_a = split_ca(left, n_threads).unwrap();
     let splitted_b = split_ca(right, n_threads).unwrap();
     match (
@@ -353,26 +353,24 @@ pub(crate) fn prepare_strs<'a>(
     been_split: &'a [Utf8Chunked],
     hb: &RandomState,
 ) -> Vec<Vec<StrHash<'a>>> {
-    POOL.install(|| {
-        been_split
-            .par_iter()
-            .map(|ca| {
-                ca.into_iter()
-                    .map(|opt_s| {
-                        let mut state = hb.build_hasher();
-                        opt_s.hash(&mut state);
-                        let hash = state.finish();
-                        StrHash::new(opt_s, hash)
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect()
-    })
+    been_split
+        .par_iter()
+        .map(|ca| {
+            ca.into_iter()
+                .map(|opt_s| {
+                    let mut state = hb.build_hasher();
+                    opt_s.hash(&mut state);
+                    let hash = state.finish();
+                    StrHash::new(opt_s, hash)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 impl HashJoin<Utf8Type> for Utf8Chunked {
     fn hash_join_inner(&self, other: &Utf8Chunked) -> Vec<(IdxSize, IdxSize)> {
-        let n_threads = POOL.current_num_threads();
+        let n_threads = 1 as usize;
 
         let (a, b, swap) = det_hash_prone_order!(self, other);
 
@@ -386,7 +384,7 @@ impl HashJoin<Utf8Type> for Utf8Chunked {
     }
 
     fn hash_join_left(&self, other: &Utf8Chunked) -> Vec<(IdxSize, Option<IdxSize>)> {
-        let n_threads = POOL.current_num_threads();
+        let n_threads = 1 as usize;
 
         let hb = RandomState::default();
         let splitted_a = split_ca(self, n_threads).unwrap();

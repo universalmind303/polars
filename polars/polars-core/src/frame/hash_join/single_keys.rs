@@ -40,8 +40,9 @@ where
     // We will create a hashtable in every thread.
     // We use the hash to partition the keys to the matching hashtable.
     // Every thread traverses all keys/hashes and ignores the ones that doesn't fall in that partition.
-    POOL.install(|| {
-        (0..n_partitions).into_par_iter().map(|partition_no| {
+    (0..n_partitions)
+        .into_par_iter()
+        .map(|partition_no| {
             let partition_no = partition_no as u64;
 
             let mut hash_tbl: PlHashMap<T, Vec<IdxSize>> =
@@ -76,8 +77,7 @@ where
             }
             hash_tbl
         })
-    })
-    .collect()
+        .collect()
 }
 
 pub(super) fn hash_join_tuples_inner<T, IntoSlice>(
@@ -108,43 +108,41 @@ where
         .collect::<Vec<_>>();
     // next we probe the other relation
     // code duplication is because we want to only do the swap check once
-    POOL.install(|| {
-        probe
-            .into_par_iter()
-            .zip(offsets)
-            .map(|(probe, offset)| {
-                let probe = probe.as_ref();
-                // local reference
-                let hash_tbls = &hash_tbls;
-                let mut results = Vec::with_capacity(probe.len());
-                let local_offset = offset;
+    probe
+        .into_par_iter()
+        .zip(offsets)
+        .map(|(probe, offset)| {
+            let probe = probe.as_ref();
+            // local reference
+            let hash_tbls = &hash_tbls;
+            let mut results = Vec::with_capacity(probe.len());
+            let local_offset = offset;
 
-                // branch is to hoist swap out of the inner loop.
-                if swap {
-                    probe_inner(
-                        probe,
-                        hash_tbls,
-                        &mut results,
-                        local_offset,
-                        n_tables,
-                        |idx_a, idx_b| (idx_b, idx_a),
-                    )
-                } else {
-                    probe_inner(
-                        probe,
-                        hash_tbls,
-                        &mut results,
-                        local_offset,
-                        n_tables,
-                        |idx_a, idx_b| (idx_a, idx_b),
-                    )
-                }
+            // branch is to hoist swap out of the inner loop.
+            if swap {
+                probe_inner(
+                    probe,
+                    hash_tbls,
+                    &mut results,
+                    local_offset,
+                    n_tables,
+                    |idx_a, idx_b| (idx_b, idx_a),
+                )
+            } else {
+                probe_inner(
+                    probe,
+                    hash_tbls,
+                    &mut results,
+                    local_offset,
+                    n_tables,
+                    |idx_a, idx_b| (idx_a, idx_b),
+                )
+            }
 
-                results
-            })
-            .flatten()
-            .collect()
-    })
+            results
+        })
+        .flatten()
+        .collect()
 }
 
 pub(super) fn hash_join_tuples_left<T, IntoSlice>(
@@ -173,44 +171,42 @@ where
     debug_assert!(n_tables.is_power_of_two());
 
     // next we probe the other relation
-    POOL.install(|| {
-        probe
-            .into_par_iter()
-            .zip(offsets)
-            // probes_hashes: Vec<u64> processed by this thread
-            // offset: offset index
-            .map(|(probe, offset)| {
-                // local reference
-                let hash_tbls = &hash_tbls;
-                let probe = probe.as_ref();
+    probe
+        .into_par_iter()
+        .zip(offsets)
+        // probes_hashes: Vec<u64> processed by this thread
+        // offset: offset index
+        .map(|(probe, offset)| {
+            // local reference
+            let hash_tbls = &hash_tbls;
+            let probe = probe.as_ref();
 
-                // assume the result tuples equal lenght of the no. of hashes processed by this thread.
-                let mut results = Vec::with_capacity(probe.len());
+            // assume the result tuples equal lenght of the no. of hashes processed by this thread.
+            let mut results = Vec::with_capacity(probe.len());
 
-                probe.iter().enumerate().for_each(|(idx_a, k)| {
-                    let idx_a = (idx_a + offset) as IdxSize;
-                    // probe table that contains the hashed value
-                    let current_probe_table = unsafe {
-                        get_hash_tbl_threaded_join_partitioned(k.as_u64(), hash_tbls, n_tables)
-                    };
+            probe.iter().enumerate().for_each(|(idx_a, k)| {
+                let idx_a = (idx_a + offset) as IdxSize;
+                // probe table that contains the hashed value
+                let current_probe_table = unsafe {
+                    get_hash_tbl_threaded_join_partitioned(k.as_u64(), hash_tbls, n_tables)
+                };
 
-                    // we already hashed, so we don't have to hash again.
-                    let value = current_probe_table.get(k);
+                // we already hashed, so we don't have to hash again.
+                let value = current_probe_table.get(k);
 
-                    match value {
-                        // left and right matches
-                        Some(indexes_b) => {
-                            results.extend(indexes_b.iter().map(|&idx_b| (idx_a, Some(idx_b))))
-                        }
-                        // only left values, right = null
-                        None => results.push((idx_a, None)),
+                match value {
+                    // left and right matches
+                    Some(indexes_b) => {
+                        results.extend(indexes_b.iter().map(|&idx_b| (idx_a, Some(idx_b))))
                     }
-                });
-                results
-            })
-            .flatten()
-            .collect()
-    })
+                    // only left values, right = null
+                    None => results.push((idx_a, None)),
+                }
+            });
+            results
+        })
+        .flatten()
+        .collect()
 }
 
 /// Probe the build table and add tuples to the results (inner join)

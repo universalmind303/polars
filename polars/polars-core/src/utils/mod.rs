@@ -1,7 +1,6 @@
 pub(crate) mod series;
 
 use crate::prelude::*;
-use crate::POOL;
 pub use arrow;
 pub use polars_arrow::utils::TrustMyLength;
 pub use polars_arrow::utils::*;
@@ -24,7 +23,7 @@ impl<T> Deref for Wrap<T> {
 }
 
 pub(crate) fn set_partition_size() -> usize {
-    let mut n_partitions = POOL.current_num_threads();
+    let mut n_partitions = 1 as usize;
     // set n_partitions to closes 2^n above the no of threads.
     loop {
         if n_partitions.is_power_of_two() {
@@ -706,7 +705,7 @@ pub fn parallel_op_series<F>(f: F, s: Series, n_threads: Option<usize>) -> Resul
 where
     F: Fn(Series) -> Result<Series> + Send + Sync,
 {
-    let n_threads = n_threads.unwrap_or_else(|| POOL.current_num_threads());
+    let n_threads = n_threads.unwrap_or_else(|| 1);
     let splits = split_offsets(s.len(), n_threads);
 
     let chunks = splits

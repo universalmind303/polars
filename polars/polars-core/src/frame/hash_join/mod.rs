@@ -13,7 +13,7 @@ use crate::vector_hasher::{
     create_hash_and_keys_threaded_vectorized, prepare_hashed_relation_threaded, this_partition,
     AsU64, StrHash,
 };
-use crate::{datatypes::PlHashMap, POOL};
+use crate::{datatypes::PlHashMap};
 use ahash::RandomState;
 use hashbrown::hash_map::{Entry, RawEntryMut};
 use hashbrown::HashMap;
@@ -354,7 +354,7 @@ impl DataFrame {
                 let (left, right, swap) = det_hash_prone_order!(left, right);
                 let join_tuples = inner_join_multiple_keys(&left, &right, swap);
 
-                let (df_left, df_right) = POOL.join(
+                let (df_left, df_right) = rayon::join(
                     || self.create_left_df(&join_tuples, false),
                     || unsafe {
                         // remove join columns
@@ -370,7 +370,7 @@ impl DataFrame {
                 let right = DataFrame::new_no_checks(selected_right_physical);
                 let join_tuples = left_join_multiple_keys(&left, &right);
 
-                let (df_left, df_right) = POOL.join(
+                let (df_left, df_right) = rayon::join(
                     || self.create_left_df(&join_tuples, true),
                     || unsafe {
                         // remove join columns
@@ -391,7 +391,7 @@ impl DataFrame {
                 let opt_join_tuples = outer_join_multiple_keys(&left, &right, swap);
 
                 // Take the left and right dataframes by join tuples
-                let (df_left, df_right) = POOL.join(
+                let (df_left, df_right) = rayon::join(
                     || unsafe {
                         remove_selected(self, &selected_left).take_opt_iter_unchecked(
                             opt_join_tuples
@@ -515,7 +515,7 @@ impl DataFrame {
 
         let join_tuples = s_left.hash_join_inner(s_right);
 
-        let (df_left, df_right) = POOL.join(
+        let (df_left, df_right) = rayon::join(
             || self.create_left_df(&join_tuples, false),
             || unsafe {
                 other
@@ -581,7 +581,7 @@ impl DataFrame {
 
         let opt_join_tuples = s_left.hash_join_left(s_right);
 
-        let (df_left, df_right) = POOL.join(
+        let (df_left, df_right) = rayon::join(
             || self.create_left_df(&opt_join_tuples, true),
             || unsafe {
                 other.drop(s_right.name()).unwrap().take_opt_iter_unchecked(
@@ -627,7 +627,7 @@ impl DataFrame {
         let opt_join_tuples = s_left.hash_join_outer(s_right);
 
         // Take the left and right dataframes by join tuples
-        let (mut df_left, df_right) = POOL.join(
+        let (mut df_left, df_right) = rayon::join(
             || unsafe {
                 self.drop(s_left.name()).unwrap().take_opt_iter_unchecked(
                     opt_join_tuples

@@ -1,4 +1,3 @@
-use crate::POOL;
 use num::{Bounded, Num, NumCast, ToPrimitive, Zero};
 use rayon::prelude::*;
 
@@ -29,7 +28,7 @@ where
     T: PolarsNumericType,
     ChunkedArray<T>: IntoSeries,
 {
-    let ca: ChunkedArray<T> = POOL.install(|| groups.into_par_iter().map(f).collect());
+    let ca: ChunkedArray<T> = groups.into_par_iter().map(f).collect();
     Some(ca.into_series())
 }
 
@@ -41,7 +40,7 @@ where
     T: PolarsNumericType,
     ChunkedArray<T>: IntoSeries,
 {
-    let ca: ChunkedArray<T> = POOL.install(|| groups.all().into_par_iter().map(f).collect());
+    let ca: ChunkedArray<T> = groups.all().into_par_iter().map(f).collect();
     Some(ca.into_series())
 }
 
@@ -51,7 +50,7 @@ where
     T: PolarsNumericType,
     ChunkedArray<T>: IntoSeries,
 {
-    let ca: ChunkedArray<T> = POOL.install(|| groups.par_iter().copied().map(f).collect());
+    let ca: ChunkedArray<T> = groups.par_iter().copied().map(f).collect();
     Some(ca.into_series())
 }
 

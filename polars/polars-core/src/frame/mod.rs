@@ -32,7 +32,7 @@ use crate::prelude::sort::prepare_argsort;
 use crate::vector_hasher::boost_hash_combine;
 #[cfg(feature = "row_hash")]
 use crate::vector_hasher::df_rows_to_hashes_threaded;
-use crate::POOL;
+#[cfg(feature = "multi-threaded")]
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::hash::{BuildHasher, Hash, Hasher};
@@ -1374,7 +1374,7 @@ impl DataFrame {
     /// Does a filter but splits thread chunks vertically instead of horizontally
     /// This yields a DataFrame with `n_chunks == n_threads`.
     fn filter_vertical(&self, mask: &BooleanChunked) -> Result<Self> {
-        let n_threads = POOL.current_num_threads();
+        let n_threads = 1 as usize;
 
         let masks = split_ca(mask, n_threads).unwrap();
         let dfs = split_df(self, n_threads).unwrap();
@@ -1601,7 +1601,7 @@ impl DataFrame {
     }
 
     unsafe fn take_unchecked_vectical(&self, indices: &IdxCa) -> Self {
-        let n_threads = POOL.current_num_threads();
+        let n_threads = 1 as usize;
         let idxs = split_ca(indices, n_threads).unwrap();
 
         let dfs: Vec<_> = idxs
@@ -2268,7 +2268,7 @@ impl DataFrame {
     /// ```
     #[must_use]
     pub fn max(&self) -> Self {
-        let columns = POOL.install(|| self.columns.par_iter().map(|s| s.max_as_series()).collect());
+        let columns = self.columns.par_iter().map(|s| s.max_as_series()).collect();
         DataFrame::new_no_checks(columns)
     }
 
@@ -2302,7 +2302,7 @@ impl DataFrame {
     /// ```
     #[must_use]
     pub fn std(&self) -> Self {
-        let columns = POOL.install(|| self.columns.par_iter().map(|s| s.std_as_series()).collect());
+        let columns = self.columns.par_iter().map(|s| s.std_as_series()).collect();
         DataFrame::new_no_checks(columns)
     }
     /// Aggregate the columns to their variation values.
@@ -2335,7 +2335,7 @@ impl DataFrame {
     /// ```
     #[must_use]
     pub fn var(&self) -> Self {
-        let columns = POOL.install(|| self.columns.par_iter().map(|s| s.var_as_series()).collect());
+        let columns = self.columns.par_iter().map(|s| s.var_as_series()).collect();
         DataFrame::new_no_checks(columns)
     }
 
@@ -2369,7 +2369,7 @@ impl DataFrame {
     /// ```
     #[must_use]
     pub fn min(&self) -> Self {
-        let columns = POOL.install(|| self.columns.par_iter().map(|s| s.min_as_series()).collect());
+        let columns = self.columns.par_iter().map(|s| s.min_as_series()).collect();
         DataFrame::new_no_checks(columns)
     }
 
@@ -2403,7 +2403,7 @@ impl DataFrame {
     /// ```
     #[must_use]
     pub fn sum(&self) -> Self {
-        let columns = POOL.install(|| self.columns.par_iter().map(|s| s.sum_as_series()).collect());
+        let columns = self.columns.par_iter().map(|s| s.sum_as_series()).collect();
         DataFrame::new_no_checks(columns)
     }
 
@@ -2437,12 +2437,11 @@ impl DataFrame {
     /// ```
     #[must_use]
     pub fn mean(&self) -> Self {
-        let columns = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| s.mean_as_series())
-                .collect()
-        });
+        let columns = self
+            .columns
+            .par_iter()
+            .map(|s| s.mean_as_series())
+            .collect();
         DataFrame::new_no_checks(columns)
     }
 
@@ -2476,23 +2475,21 @@ impl DataFrame {
     /// ```
     #[must_use]
     pub fn median(&self) -> Self {
-        let columns = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| s.median_as_series())
-                .collect()
-        });
+        let columns = self
+            .columns
+            .par_iter()
+            .map(|s| s.median_as_series())
+            .collect();
         DataFrame::new_no_checks(columns)
     }
 
     /// Aggregate the columns to their quantile values.
     pub fn quantile(&self, quantile: f64, interpol: QuantileInterpolOptions) -> Result<Self> {
-        let columns = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| s.quantile_as_series(quantile, interpol))
-                .collect::<Result<Vec<_>>>()
-        })?;
+        let columns = self
+            .columns
+            .par_iter()
+            .map(|s| s.quantile_as_series(quantile, interpol))
+            .collect::<Result<Vec<_>>>()?;
         Ok(DataFrame::new_no_checks(columns))
     }
 
@@ -2512,16 +2509,14 @@ impl DataFrame {
             _ => {
                 // the try_reduce_with is a bit slower in parallelism,
                 // but I don't think it matters here as we parallelize over columns, not over elements
-                POOL.install(|| {
-                    self.columns
-                        .par_iter()
-                        .map(|s| Ok(Cow::Borrowed(s)))
-                        .try_reduce_with(|l, r| min_fn(&l, &r).map(Cow::Owned))
-                        // we can unwrap the option, because we are certain there is a column
-                        // we started this operation on 3 columns
-                        .unwrap()
-                        .map(|cow| Some(cow.into_owned()))
-                })
+                self.columns
+                    .par_iter()
+                    .map(|s| Ok(Cow::Borrowed(s)))
+                    .try_reduce_with(|l, r| min_fn(&l, &r).map(Cow::Owned))
+                    // we can unwrap the option, because we are certain there is a column
+                    // we started this operation on 3 columns
+                    .unwrap()
+                    .map(|cow| Some(cow.into_owned()))
             }
         }
     }
@@ -2542,16 +2537,14 @@ impl DataFrame {
             _ => {
                 // the try_reduce_with is a bit slower in parallelism,
                 // but I don't think it matters here as we parallelize over columns, not over elements
-                POOL.install(|| {
-                    self.columns
-                        .par_iter()
-                        .map(|s| Ok(Cow::Borrowed(s)))
-                        .try_reduce_with(|l, r| max_fn(&l, &r).map(Cow::Owned))
-                        // we can unwrap the option, because we are certain there is a column
-                        // we started this operation on 3 columns
-                        .unwrap()
-                        .map(|cow| Some(cow.into_owned()))
-                })
+                self.columns
+                    .par_iter()
+                    .map(|s| Ok(Cow::Borrowed(s)))
+                    .try_reduce_with(|l, r| max_fn(&l, &r).map(Cow::Owned))
+                    // we can unwrap the option, because we are certain there is a column
+                    // we started this operation on 3 columns
+                    .unwrap()
+                    .map(|cow| Some(cow.into_owned()))
             }
         }
     }
@@ -2580,16 +2573,14 @@ impl DataFrame {
             _ => {
                 // the try_reduce_with is a bit slower in parallelism,
                 // but I don't think it matters here as we parallelize over columns, not over elements
-                POOL.install(|| {
-                    self.columns
-                        .par_iter()
-                        .map(|s| Ok(Cow::Borrowed(s)))
-                        .try_reduce_with(|l, r| sum_fn(&l, &r, none_strategy).map(Cow::Owned))
-                        // we can unwrap the option, because we are certain there is a column
-                        // we started this operation on 3 columns
-                        .unwrap()
-                        .map(|cow| Some(cow.into_owned()))
-                })
+                self.columns
+                    .par_iter()
+                    .map(|s| Ok(Cow::Borrowed(s)))
+                    .try_reduce_with(|l, r| sum_fn(&l, &r, none_strategy).map(Cow::Owned))
+                    // we can unwrap the option, because we are certain there is a column
+                    // we started this operation on 3 columns
+                    .unwrap()
+                    .map(|cow| Some(cow.into_owned()))
             }
         }
     }
@@ -2612,7 +2603,7 @@ impl DataFrame {
                         .unwrap()
                 };
 
-                let (sum, null_count) = POOL.install(|| rayon::join(sum, null_count));
+                let (sum, null_count) = rayon::join(sum, null_count);
                 let sum = sum?;
 
                 // value lengths: len - null_count
@@ -2701,12 +2692,11 @@ impl DataFrame {
     ///  +------+------+------+--------+--------+--------+---------+---------+---------+
     /// ```
     pub fn to_dummies(&self) -> Result<Self> {
-        let cols = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| s.to_dummies())
-                .collect::<Result<Vec<_>>>()
-        })?;
+        let cols = self
+            .columns
+            .par_iter()
+            .map(|s| s.to_dummies())
+            .collect::<Result<Vec<_>>>()?;
 
         accumulate_dataframes_horizontal(cols)
     }
@@ -2902,7 +2892,7 @@ impl DataFrame {
     /// Hash and combine the row values
     #[cfg(feature = "row_hash")]
     pub fn hash_rows(&self, hasher_builder: Option<RandomState>) -> Result<UInt64Chunked> {
-        let dfs = split_df(self, POOL.current_num_threads())?;
+        let dfs = split_df(self, 1 as usize)?;
         let (cas, _) = df_rows_to_hashes_threaded(&dfs, hasher_builder);
 
         let mut iter = cas.into_iter();

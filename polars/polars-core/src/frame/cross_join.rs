@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::utils::{concat_df, CustomIterTools, NoNull};
-use crate::POOL;
 
 impl DataFrame {
     /// Creates the cartesian product from both frames, preserves the order of the left keys.
@@ -30,7 +29,7 @@ impl DataFrame {
             concat_df(iter).unwrap()
         };
 
-        let (l_df, r_df) = POOL.install(|| rayon::join(create_left_df, create_right_df));
+        let (l_df, r_df) = rayon::join(create_left_df, create_right_df);
 
         self.finish_join(l_df, r_df, suffix)
     }

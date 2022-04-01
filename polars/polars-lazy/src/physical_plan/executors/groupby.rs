@@ -288,7 +288,7 @@ impl Executor for PartitionGroupByExec {
         }
 
         // Run the partitioned aggregations
-        let n_threads = POOL.current_num_threads();
+        let n_threads = 1 as usize;
         let dfs = run_partitions(&original_df, self, state, n_threads, self.maintain_order)?;
 
         // MERGE phase

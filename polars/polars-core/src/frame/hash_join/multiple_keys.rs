@@ -6,7 +6,6 @@ use crate::prelude::*;
 use crate::utils::series::to_physical_and_bit_repr;
 use crate::utils::{set_partition_size, split_df};
 use crate::vector_hasher::{df_rows_to_hashes_threaded, this_partition, IdBuildHasher, IdxHash};
-use crate::POOL;
 use hashbrown::hash_map::RawEntryMut;
 use hashbrown::HashMap;
 use rayon::prelude::*;
@@ -36,8 +35,9 @@ pub(crate) fn create_build_table(
     // We will create a hashtable in every thread.
     // We use the hash to partition the keys to the matching hashtable.
     // Every thread traverses all keys/hashes and ignores the ones that doesn't fall in that partition.
-    POOL.install(|| {
-        (0..n_partitions).into_par_iter().map(|part_no| {
+    (0..n_partitions)
+        .into_par_iter()
+        .map(|part_no| {
             let part_no = part_no as u64;
             let mut hash_tbl: HashMap<IdxHash, Vec<IdxSize>, IdBuildHasher> =
                 HashMap::with_capacity_and_hasher(HASHMAP_INIT_SIZE, Default::default());
@@ -70,8 +70,7 @@ pub(crate) fn create_build_table(
             }
             hash_tbl
         })
-    })
-    .collect()
+        .collect()
 }
 
 fn create_build_table_outer(
@@ -85,8 +84,9 @@ fn create_build_table_outer(
     // We will create a hashtable in every thread.
     // We use the hash to partition the keys to the matching hashtable.
     // Every thread traverses all keys/hashes and ignores the ones that doesn't fall in that partition.
-    POOL.install(|| {
-        (0..n_partitions).into_par_iter().map(|part_no| {
+    (0..n_partitions)
+        .into_par_iter()
+        .map(|part_no| {
             let part_no = part_no as u64;
             let mut hash_tbl: HashMap<IdxHash, (bool, Vec<IdxSize>), IdBuildHasher> =
                 HashMap::with_capacity_and_hasher(HASHMAP_INIT_SIZE, Default::default());
@@ -119,8 +119,7 @@ fn create_build_table_outer(
             }
             hash_tbl
         })
-    })
-    .collect()
+        .collect()
 }
 
 /// Probe the build table and add tuples to the results (inner join)
@@ -180,7 +179,7 @@ pub(crate) fn inner_join_multiple_keys(
     // we assume that the b DataFrame is the shorter relation.
     // b will be used for the build phase.
 
-    let n_threads = POOL.current_num_threads();
+    let n_threads = 1 as usize;
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 
@@ -195,46 +194,43 @@ pub(crate) fn inner_join_multiple_keys(
     let offsets = get_offsets(&probe_hashes);
     // next we probe the other relation
     // code duplication is because we want to only do the swap check once
-    POOL.install(|| {
-        probe_hashes
-            .into_par_iter()
-            .zip(offsets)
-            .map(|(probe_hashes, offset)| {
-                // local reference
-                let hash_tbls = &hash_tbls;
-                let mut results =
-                    Vec::with_capacity(probe_hashes.len() / POOL.current_num_threads());
-                let local_offset = offset;
-                // code duplication is to hoist swap out of the inner loop.
-                if swap {
-                    probe_inner(
-                        &probe_hashes,
-                        hash_tbls,
-                        &mut results,
-                        local_offset,
-                        n_tables,
-                        a,
-                        b,
-                        |idx_a, idx_b| (idx_b, idx_a),
-                    )
-                } else {
-                    probe_inner(
-                        &probe_hashes,
-                        hash_tbls,
-                        &mut results,
-                        local_offset,
-                        n_tables,
-                        a,
-                        b,
-                        |idx_a, idx_b| (idx_a, idx_b),
-                    )
-                }
+    probe_hashes
+        .into_par_iter()
+        .zip(offsets)
+        .map(|(probe_hashes, offset)| {
+            // local reference
+            let hash_tbls = &hash_tbls;
+            let mut results = Vec::with_capacity(probe_hashes.len());
+            let local_offset = offset;
+            // code duplication is to hoist swap out of the inner loop.
+            if swap {
+                probe_inner(
+                    &probe_hashes,
+                    hash_tbls,
+                    &mut results,
+                    local_offset,
+                    n_tables,
+                    a,
+                    b,
+                    |idx_a, idx_b| (idx_b, idx_a),
+                )
+            } else {
+                probe_inner(
+                    &probe_hashes,
+                    hash_tbls,
+                    &mut results,
+                    local_offset,
+                    n_tables,
+                    a,
+                    b,
+                    |idx_a, idx_b| (idx_a, idx_b),
+                )
+            }
 
-                results
-            })
-            .flatten()
-            .collect()
-    })
+            results
+        })
+        .flatten()
+        .collect()
 }
 
 #[cfg(feature = "private")]
@@ -255,7 +251,7 @@ pub(crate) fn left_join_multiple_keys(
     debug_assert!(!a.iter().any(|s| s.is_logical()));
     debug_assert!(!b.iter().any(|s| s.is_logical()));
 
-    let n_threads = POOL.current_num_threads();
+    let n_threads = 1 as usize;
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 
@@ -271,49 +267,45 @@ pub(crate) fn left_join_multiple_keys(
 
     // next we probe the other relation
     // code duplication is because we want to only do the swap check once
-    POOL.install(|| {
-        probe_hashes
-            .into_par_iter()
-            .zip(offsets)
-            .map(|(probe_hashes, offset)| {
-                // local reference
-                let hash_tbls = &hash_tbls;
-                let mut results =
-                    Vec::with_capacity(probe_hashes.len() / POOL.current_num_threads());
-                let local_offset = offset;
+    probe_hashes
+        .into_par_iter()
+        .zip(offsets)
+        .map(|(probe_hashes, offset)| {
+            // local reference
+            let hash_tbls = &hash_tbls;
+            let mut results = Vec::with_capacity(probe_hashes.len());
+            let local_offset = offset;
 
-                let mut idx_a = local_offset as IdxSize;
-                for probe_hashes in probe_hashes.data_views() {
-                    for &h in probe_hashes {
-                        // probe table that contains the hashed value
-                        let current_probe_table = unsafe {
-                            get_hash_tbl_threaded_join_partitioned(h, hash_tbls, n_tables)
-                        };
+            let mut idx_a = local_offset as IdxSize;
+            for probe_hashes in probe_hashes.data_views() {
+                for &h in probe_hashes {
+                    // probe table that contains the hashed value
+                    let current_probe_table =
+                        unsafe { get_hash_tbl_threaded_join_partitioned(h, hash_tbls, n_tables) };
 
-                        let entry = current_probe_table.raw_entry().from_hash(h, |idx_hash| {
-                            let idx_b = idx_hash.idx;
-                            // Safety:
-                            // indices in a join operation are always in bounds.
-                            unsafe { compare_df_rows2(a, b, idx_a as usize, idx_b as usize) }
-                        });
+                    let entry = current_probe_table.raw_entry().from_hash(h, |idx_hash| {
+                        let idx_b = idx_hash.idx;
+                        // Safety:
+                        // indices in a join operation are always in bounds.
+                        unsafe { compare_df_rows2(a, b, idx_a as usize, idx_b as usize) }
+                    });
 
-                        match entry {
-                            // left and right matches
-                            Some((_, indexes_b)) => {
-                                results.extend(indexes_b.iter().map(|&idx_b| (idx_a, Some(idx_b))))
-                            }
-                            // only left values, right = null
-                            None => results.push((idx_a, None)),
+                    match entry {
+                        // left and right matches
+                        Some((_, indexes_b)) => {
+                            results.extend(indexes_b.iter().map(|&idx_b| (idx_a, Some(idx_b))))
                         }
-                        idx_a += 1;
+                        // only left values, right = null
+                        None => results.push((idx_a, None)),
                     }
+                    idx_a += 1;
                 }
+            }
 
-                results
-            })
-            .flatten()
-            .collect()
-    })
+            results
+        })
+        .flatten()
+        .collect()
 }
 
 /// Probe the build table and add tuples to the results (inner join)
@@ -397,7 +389,7 @@ pub(crate) fn outer_join_multiple_keys(
     let size = a.height() + b.height();
     let mut results = Vec::with_capacity(size);
 
-    let n_threads = POOL.current_num_threads();
+    let n_threads = 1 as usize;
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 

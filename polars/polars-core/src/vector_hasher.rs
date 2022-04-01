@@ -1,7 +1,6 @@
 use crate::datatypes::UInt64Chunked;
 use crate::prelude::*;
 use crate::utils::arrow::array::Array;
-use crate::POOL;
 use ahash::{CallHasher, RandomState};
 use arrow::bitmap::utils::get_bit_unchecked;
 use hashbrown::{hash_map::RawEntryMut, HashMap};

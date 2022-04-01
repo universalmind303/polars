@@ -1,7 +1,6 @@
 use super::*;
 use crate::utils::{split_ca, split_df};
 use crate::vector_hasher::{df_rows_to_hashes_threaded, AsU64};
-use crate::POOL;
 use ahash::RandomState;
 use num::Zero;
 use rayon::prelude::*;
@@ -116,7 +115,7 @@ where
     let right_asof = right_asof.rechunk();
     let right_asof = right_asof.cont_slice().unwrap();
 
-    let n_threads = POOL.current_num_threads();
+    let n_threads = 1;
     let splitted_left = split_ca(by_left, n_threads).unwrap();
     let splitted_right = split_ca(by_right, n_threads).unwrap();
 
@@ -146,80 +145,73 @@ where
     debug_assert!(n_tables.is_power_of_two());
 
     // next we probe the right relation
-    POOL.install(|| {
-        vals_left
-            .into_par_iter()
-            .zip(offsets)
-            // probes_hashes: Vec<u64> processed by this thread
-            // offset: offset index
-            .map(|(vals_left, offset)| {
-                // local reference
-                let hash_tbls = &hash_tbls;
+    vals_left
+        .into_par_iter()
+        .zip(offsets)
+        // probes_hashes: Vec<u64> processed by this thread
+        // offset: offset index
+        .map(|(vals_left, offset)| {
+            // local reference
+            let hash_tbls = &hash_tbls;
 
-                // assume the result tuples equal length of the no. of hashes processed by this thread.
-                let mut results = Vec::with_capacity(vals_left.len());
+            // assume the result tuples equal length of the no. of hashes processed by this thread.
+            let mut results = Vec::with_capacity(vals_left.len());
 
-                let mut right_tbl_offsets = PlHashMap::with_capacity(64);
+            let mut right_tbl_offsets = PlHashMap::with_capacity(64);
 
-                vals_left.iter().enumerate().for_each(|(idx_a, k)| {
-                    let idx_a = (idx_a + offset) as IdxSize;
-                    // probe table that contains the hashed value
-                    let current_probe_table = unsafe {
-                        get_hash_tbl_threaded_join_partitioned(k.as_u64(), hash_tbls, n_tables)
-                    };
+            vals_left.iter().enumerate().for_each(|(idx_a, k)| {
+                let idx_a = (idx_a + offset) as IdxSize;
+                // probe table that contains the hashed value
+                let current_probe_table = unsafe {
+                    get_hash_tbl_threaded_join_partitioned(k.as_u64(), hash_tbls, n_tables)
+                };
 
-                    // we already hashed, so we don't have to hash again.
-                    let value = current_probe_table.get(k);
+                // we already hashed, so we don't have to hash again.
+                let value = current_probe_table.get(k);
 
-                    match value {
-                        // left and right matches
-                        Some(indexes_b) => {
-                            let (offset_slice, mut previous_join_idx) =
-                                *right_tbl_offsets.get(k).unwrap_or(&(0usize, None));
-                            debug_assert!((idx_a as usize) < left_asof.len());
-                            let val_l = unsafe { *left_asof.get_unchecked(idx_a as usize) };
-                            // Safety;
-                            // elide bound checks
-                            let (join_idx, offset_slice_add) = unsafe {
-                                join_asof_fn(
-                                    val_l,
-                                    right_asof,
-                                    &indexes_b[offset_slice..],
-                                    tolerance,
-                                )
-                            };
-                            let offset_slice = offset_slice + offset_slice_add;
+                match value {
+                    // left and right matches
+                    Some(indexes_b) => {
+                        let (offset_slice, mut previous_join_idx) =
+                            *right_tbl_offsets.get(k).unwrap_or(&(0usize, None));
+                        debug_assert!((idx_a as usize) < left_asof.len());
+                        let val_l = unsafe { *left_asof.get_unchecked(idx_a as usize) };
+                        // Safety;
+                        // elide bound checks
+                        let (join_idx, offset_slice_add) = unsafe {
+                            join_asof_fn(val_l, right_asof, &indexes_b[offset_slice..], tolerance)
+                        };
+                        let offset_slice = offset_slice + offset_slice_add;
 
-                            match join_idx {
-                                Some(_) => {
-                                    results.push(join_idx);
-                                    right_tbl_offsets.insert(k, (offset_slice, join_idx));
-                                }
-                                None => {
-                                    if tolerance > num::zero() {
-                                        if let Some(idx) = previous_join_idx {
-                                            debug_assert!((idx as usize) < right_asof.len());
-                                            let val_r =
-                                                unsafe { *right_asof.get_unchecked(idx as usize) };
-                                            let dist = val_l - val_r;
-                                            if dist > tolerance {
-                                                previous_join_idx = None;
-                                            }
+                        match join_idx {
+                            Some(_) => {
+                                results.push(join_idx);
+                                right_tbl_offsets.insert(k, (offset_slice, join_idx));
+                            }
+                            None => {
+                                if tolerance > num::zero() {
+                                    if let Some(idx) = previous_join_idx {
+                                        debug_assert!((idx as usize) < right_asof.len());
+                                        let val_r =
+                                            unsafe { *right_asof.get_unchecked(idx as usize) };
+                                        let dist = val_l - val_r;
+                                        if dist > tolerance {
+                                            previous_join_idx = None;
                                         }
                                     }
-                                    results.push(previous_join_idx)
                                 }
+                                results.push(previous_join_idx)
                             }
                         }
-                        // only left values, right = null
-                        None => results.push(None),
                     }
-                });
-                results
-            })
-            .flatten()
-            .collect()
-    })
+                    // only left values, right = null
+                    None => results.push(None),
+                }
+            });
+            results
+        })
+        .flatten()
+        .collect()
 }
 
 fn asof_join_by_utf8<T>(
@@ -250,7 +242,7 @@ where
     let right_asof = right_asof.rechunk();
     let right_asof = right_asof.cont_slice().unwrap();
 
-    let n_threads = POOL.current_num_threads();
+    let n_threads = 1 as usize;
     let splitted_left = split_ca(by_left, n_threads).unwrap();
     let splitted_right = split_ca(by_right, n_threads).unwrap();
 
@@ -275,80 +267,73 @@ where
     debug_assert!(n_tables.is_power_of_two());
 
     // next we probe the right relation
-    POOL.install(|| {
-        vals_left
-            .into_par_iter()
-            .zip(offsets)
-            // probes_hashes: Vec<u64> processed by this thread
-            // offset: offset index
-            .map(|(vals_left, offset)| {
-                // local reference
-                let hash_tbls = &hash_tbls;
+    vals_left
+        .into_par_iter()
+        .zip(offsets)
+        // probes_hashes: Vec<u64> processed by this thread
+        // offset: offset index
+        .map(|(vals_left, offset)| {
+            // local reference
+            let hash_tbls = &hash_tbls;
 
-                // assume the result tuples equal lenght of the no. of hashes processed by this thread.
-                let mut results = Vec::with_capacity(vals_left.len());
+            // assume the result tuples equal lenght of the no. of hashes processed by this thread.
+            let mut results = Vec::with_capacity(vals_left.len());
 
-                let mut right_tbl_offsets = PlHashMap::with_capacity(64);
+            let mut right_tbl_offsets = PlHashMap::with_capacity(64);
 
-                vals_left.iter().enumerate().for_each(|(idx_a, k)| {
-                    let idx_a = (idx_a + offset) as IdxSize;
-                    // probe table that contains the hashed value
-                    let current_probe_table = unsafe {
-                        get_hash_tbl_threaded_join_partitioned(k.as_u64(), hash_tbls, n_tables)
-                    };
+            vals_left.iter().enumerate().for_each(|(idx_a, k)| {
+                let idx_a = (idx_a + offset) as IdxSize;
+                // probe table that contains the hashed value
+                let current_probe_table = unsafe {
+                    get_hash_tbl_threaded_join_partitioned(k.as_u64(), hash_tbls, n_tables)
+                };
 
-                    // we already hashed, so we don't have to hash again.
-                    let value = current_probe_table.get(k);
+                // we already hashed, so we don't have to hash again.
+                let value = current_probe_table.get(k);
 
-                    match value {
-                        // left and right matches
-                        Some(indexes_b) => {
-                            let (offset_slice, mut previous_join_idx) =
-                                *right_tbl_offsets.get(k).unwrap_or(&(0usize, None));
-                            debug_assert!((idx_a as usize) < left_asof.len());
-                            let val_l = unsafe { *left_asof.get_unchecked(idx_a as usize) };
-                            // Safety;
-                            // elide bound checks
-                            let (join_idx, offset_slice_add) = unsafe {
-                                join_asof_fn(
-                                    val_l,
-                                    right_asof,
-                                    &indexes_b[offset_slice..],
-                                    tolerance,
-                                )
-                            };
-                            let offset_slice = offset_slice + offset_slice_add;
+                match value {
+                    // left and right matches
+                    Some(indexes_b) => {
+                        let (offset_slice, mut previous_join_idx) =
+                            *right_tbl_offsets.get(k).unwrap_or(&(0usize, None));
+                        debug_assert!((idx_a as usize) < left_asof.len());
+                        let val_l = unsafe { *left_asof.get_unchecked(idx_a as usize) };
+                        // Safety;
+                        // elide bound checks
+                        let (join_idx, offset_slice_add) = unsafe {
+                            join_asof_fn(val_l, right_asof, &indexes_b[offset_slice..], tolerance)
+                        };
+                        let offset_slice = offset_slice + offset_slice_add;
 
-                            match join_idx {
-                                Some(_) => {
-                                    results.push(join_idx);
-                                    right_tbl_offsets.insert(k, (offset_slice, join_idx));
-                                }
-                                None => {
-                                    if tolerance > num::zero() {
-                                        if let Some(idx) = previous_join_idx {
-                                            debug_assert!((idx as usize) < right_asof.len());
-                                            let val_r =
-                                                unsafe { *right_asof.get_unchecked(idx as usize) };
-                                            let dist = val_l - val_r;
-                                            if dist > tolerance {
-                                                previous_join_idx = None;
-                                            }
+                        match join_idx {
+                            Some(_) => {
+                                results.push(join_idx);
+                                right_tbl_offsets.insert(k, (offset_slice, join_idx));
+                            }
+                            None => {
+                                if tolerance > num::zero() {
+                                    if let Some(idx) = previous_join_idx {
+                                        debug_assert!((idx as usize) < right_asof.len());
+                                        let val_r =
+                                            unsafe { *right_asof.get_unchecked(idx as usize) };
+                                        let dist = val_l - val_r;
+                                        if dist > tolerance {
+                                            previous_join_idx = None;
                                         }
                                     }
-                                    results.push(previous_join_idx)
                                 }
+                                results.push(previous_join_idx)
                             }
                         }
-                        // only left values, right = null
-                        None => results.push(None),
                     }
-                });
-                results
-            })
-            .flatten()
-            .collect()
-    })
+                    // only left values, right = null
+                    None => results.push(None),
+                }
+            });
+            results
+        })
+        .flatten()
+        .collect()
 }
 
 // TODO! optimize this. This does a full scan backwards. Use the same strategy as in the single `by`
@@ -368,7 +353,7 @@ where
     let right_asof = right_asof.rechunk();
     let right_asof = right_asof.cont_slice().unwrap();
 
-    let n_threads = POOL.current_num_threads();
+    let n_threads = 1 as usize;
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 
@@ -384,54 +369,50 @@ where
 
     // next we probe the other relation
     // code duplication is because we want to only do the swap check once
-    POOL.install(|| {
-        probe_hashes
-            .into_par_iter()
-            .zip(offsets)
-            .map(|(probe_hashes, offset)| {
-                // local reference
-                let hash_tbls = &hash_tbls;
-                let mut results =
-                    Vec::with_capacity(probe_hashes.len() / POOL.current_num_threads());
-                let local_offset = offset;
+    probe_hashes
+        .into_par_iter()
+        .zip(offsets)
+        .map(|(probe_hashes, offset)| {
+            // local reference
+            let hash_tbls = &hash_tbls;
+            let mut results = Vec::with_capacity(probe_hashes.len() / 1 as usize);
+            let local_offset = offset;
 
-                let mut idx_a = local_offset as IdxSize;
-                for probe_hashes in probe_hashes.data_views() {
-                    for (idx, &h) in probe_hashes.iter().enumerate() {
-                        debug_assert!(idx + offset < left_asof.len());
+            let mut idx_a = local_offset as IdxSize;
+            for probe_hashes in probe_hashes.data_views() {
+                for (idx, &h) in probe_hashes.iter().enumerate() {
+                    debug_assert!(idx + offset < left_asof.len());
+                    // Safety:
+                    // idx are in bounds
+                    let left_val = unsafe { *left_asof.get_unchecked(idx + offset) };
+
+                    // probe table that contains the hashed value
+                    let current_probe_table =
+                        unsafe { get_hash_tbl_threaded_join_partitioned(h, hash_tbls, n_tables) };
+
+                    let entry = current_probe_table.raw_entry().from_hash(h, |idx_hash| {
+                        let idx_b = idx_hash.idx;
                         // Safety:
-                        // idx are in bounds
-                        let left_val = unsafe { *left_asof.get_unchecked(idx + offset) };
+                        // indices in a join operation are always in bounds.
+                        unsafe { mk::compare_df_rows2(a, b, idx_a as usize, idx_b as usize) }
+                    });
 
-                        // probe table that contains the hashed value
-                        let current_probe_table = unsafe {
-                            get_hash_tbl_threaded_join_partitioned(h, hash_tbls, n_tables)
-                        };
-
-                        let entry = current_probe_table.raw_entry().from_hash(h, |idx_hash| {
-                            let idx_b = idx_hash.idx;
-                            // Safety:
-                            // indices in a join operation are always in bounds.
-                            unsafe { mk::compare_df_rows2(a, b, idx_a as usize, idx_b as usize) }
-                        });
-
-                        match entry {
-                            // left and right matches
-                            Some((_, indexes_b)) => {
-                                results.push(find_latest_leq(left_val, right_asof, indexes_b))
-                            }
-                            // only left values, right = null
-                            None => results.push(None),
+                    match entry {
+                        // left and right matches
+                        Some((_, indexes_b)) => {
+                            results.push(find_latest_leq(left_val, right_asof, indexes_b))
                         }
-                        idx_a += 1;
+                        // only left values, right = null
+                        None => results.push(None),
                     }
+                    idx_a += 1;
                 }
+            }
 
-                results
-            })
-            .flatten()
-            .collect()
-    })
+            results
+        })
+        .flatten()
+        .collect()
 }
 
 impl DataFrame {
