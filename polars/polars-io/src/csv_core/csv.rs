@@ -7,10 +7,10 @@ use crate::predicates::PhysicalIoExpr;
 use crate::utils::update_row_counts;
 use crate::RowCount;
 use polars_arrow::array::*;
+use polars_core::prelude::*;
 use polars_core::utils::accumulate_dataframes_vertical;
-use polars_core::{prelude::*, POOL};
-#[cfg(feature = "multi-threaded")]
-use polars_core::POOL;
+// #[cfg(feature = "multi-threaded")]
+// use polars_core::POOL;
 use polars_time::prelude::*;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
@@ -314,340 +314,342 @@ impl<'a> CoreReader<'a> {
         bytes: &[u8],
         predicate: Option<&Arc<dyn PhysicalIoExpr>>,
     ) -> Result<DataFrame> {
-        let logging = std::env::var("POLARS_VERBOSE").is_ok();
-        // Make the variable mutable so that we can reassign the sliced file to this variable.
-        let mut bytes = self.find_starting_point(bytes)?;
-
-        // initial row guess. We use the line statistic to guess the number of rows to allocate
-        let mut total_rows = 128;
-
-        // if None, there are less then 128 rows in the file and the statistics don't matter that much
-        if let Some((mean, std)) = get_line_stats(bytes, self.sample_size) {
-            if logging {
-                eprintln!("avg line length: {}\nstd. dev. line length: {}", mean, std);
-            }
-
-            // x % upper bound of byte length per line assuming normally distributed
-            let line_length_upper_bound = mean + 1.1 * std;
-            total_rows = (bytes.len() as f32 / (mean - 0.01 * std)) as usize;
-
-            // if we only need to parse n_rows,
-            // we first try to use the line statistics the total bytes we need to process
-            if let Some(n_rows) = self.n_rows {
-                total_rows = std::cmp::min(n_rows, total_rows);
-
-                // the guessed upper bound of  the no. of bytes in the file
-                let n_bytes = (line_length_upper_bound * (n_rows as f32)) as usize;
-
-                if n_bytes < bytes.len() {
-                    if let Some(pos) = next_line_position(
-                        &bytes[n_bytes..],
-                        self.schema.len(),
-                        self.delimiter,
-                        self.quote_char,
-                    ) {
-                        bytes = &bytes[..n_bytes + pos]
-                    }
-                }
-            }
-            if logging {
-                eprintln!("initial row estimate: {}", total_rows)
-            }
-        }
-        if total_rows == 128 {
-            n_threads = 1;
-
-            if logging {
-                eprintln!("file < 128 rows, no statistics determined")
-            }
-        }
-
-        // we also need to sort the projection to have predictable output.
-        // the `parse_lines` function expects this.
-        let projection = self
-            .projection
-            .take()
-            .map(|mut v| {
-                v.sort_unstable();
-                v
-            })
-            .unwrap_or_else(|| (0..self.schema.len()).collect());
-
-        let chunk_size = std::cmp::min(self.chunk_size, total_rows);
-        let n_chunks = total_rows / chunk_size;
-        if logging {
-            eprintln!(
-                "no. of chunks: {} processed by: {} threads at 1 chunk/thread",
-                n_chunks, n_threads
-            );
-        }
-
-        // keep track of the maximum capacity that needs to be allocated for the utf8-builder
-        // Per string column we keep a statistic of the maximum length of string bytes per chunk
-        // We must the names, not the indexes, (the indexes are incorrect due to projection
-        // pushdown)
-        let mut str_columns = Vec::with_capacity(projection.len());
-        for i in &projection {
-            let (name, dtype) = self.schema.get_index(*i).ok_or_else(||
-                PolarsError::ComputeError(
-                    format!("the given projection index: {} is out of bounds for csv schema with {} columns", i, self.schema.len()).into())
-                )?;
-
-            if dtype == &DataType::Utf8 {
-                str_columns.push(name)
-            }
-        }
-
-        // split the file by the nearest new line characters such that every thread processes
-        // approximately the same number of rows.
-        let file_chunks = get_file_chunks(
-            bytes,
-            n_threads,
-            self.schema.len(),
-            self.delimiter,
-            self.quote_char,
-        );
-
-        // If the number of threads given by the user is lower than our global thread pool we create
-        // new one.
-        let owned_pool;
-        let pool = if POOL.current_num_threads() != n_threads {
-            owned_pool = Some(
-                ThreadPoolBuilder::new()
-                    .num_threads(n_threads)
-                    .build()
-                    .unwrap(),
-            );
-            owned_pool.as_ref().unwrap()
-        } else {
-            &POOL
-        };
-
-        // all the buffers returned from the threads
-        // Structure:
-        //      the inner vec has got buffers from all the columns.
-        if predicate.is_some() {
-            // assume 10 chars per str
-            // this is not updated in low memory mode
-            let init_str_bytes = chunk_size * 10;
-            let str_capacities: Vec<_> = str_columns
-                .iter()
-                .map(|_| RunningSize::new(init_str_bytes))
-                .collect();
-
-            // An empty file with a schema should return an empty DataFrame with that schema
-            if bytes.is_empty() {
-                let buffers = init_buffers(
-                    &projection,
-                    0,
-                    &self.schema,
-                    &str_capacities,
-                    self.quote_char,
-                    self.encoding,
-                    self.ignore_parser_errors,
-                )?;
-                let df = DataFrame::new_no_checks(
-                    buffers
-                        .into_iter()
-                        .map(|buf| buf.into_series())
-                        .collect::<Result<_>>()?,
-                );
-                return Ok(df);
-            }
-
-            let dfs = pool.install(|| {
-                file_chunks
-                    .into_par_iter()
-                    .map(|(bytes_offset_thread, stop_at_nbytes)| {
-                        let delimiter = self.delimiter;
-                        let schema = self.schema.clone();
-                        let ignore_parser_errors = self.ignore_parser_errors;
-                        let projection = &projection;
-
-                        let mut read = bytes_offset_thread;
-                        let mut dfs = Vec::with_capacity(256);
-
-                        let mut last_read = usize::MAX;
-                        loop {
-                            if read >= stop_at_nbytes || read == last_read {
-                                break;
-                            }
-
-                            let mut buffers = init_buffers(
-                                projection,
-                                chunk_size,
-                                &schema,
-                                &str_capacities,
-                                self.quote_char,
-                                self.encoding,
-                                self.ignore_parser_errors,
-                            )?;
-
-                            let local_bytes = &bytes[read..stop_at_nbytes];
-
-                            last_read = read;
-                            read += parse_lines(
-                                local_bytes,
-                                read,
-                                delimiter,
-                                self.comment_char,
-                                self.quote_char,
-                                self.null_values.as_ref(),
-                                projection,
-                                &mut buffers,
-                                ignore_parser_errors,
-                                chunk_size,
-                                self.schema.len(),
-                            )?;
-
-                            let mut local_df = DataFrame::new_no_checks(
-                                buffers
-                                    .into_iter()
-                                    .map(|buf| buf.into_series())
-                                    .collect::<Result<_>>()?,
-                            );
-                            let current_row_count = local_df.height() as u32;
-                            if let Some(rc) = &self.row_count {
-                                local_df.with_row_count_mut(&rc.name, Some(rc.offset));
-                            };
-
-                            if let Some(predicate) = predicate {
-                                let s = predicate.evaluate(&local_df)?;
-                                let mask =
-                                    s.bool().expect("filter predicates was not of type boolean");
-                                local_df = local_df.filter(mask)?;
-                            }
-
-                            // update the running str bytes statistics
-                            for (str_index, name) in str_columns.iter().enumerate() {
-                                let ca = local_df.column(name)?.utf8()?;
-                                let str_bytes_len = ca.get_values_size();
-
-                                // don't update running statistics if we try to reduce string memory usage.
-                                if self.low_memory {
-                                    local_df.shrink_to_fit();
-                                    let (max, avg, last, size_hint) =
-                                        str_capacities[str_index].update(str_bytes_len);
-                                    if logging {
-                                        if size_hint < str_bytes_len {
-                                            eprintln!(
-                                                "probably needed to reallocate column: {}\
-                                    \nprevious capacity was: {}\
-                                    \nneeded capacity was: {}",
-                                                name, size_hint, str_bytes_len
-                                            );
-                                        }
-                                        eprintln!(
-                                            "column {} statistics: \nmax: {}\navg: {}\nlast: {}",
-                                            name, max, avg, last
-                                        )
-                                    }
-                                }
-                            }
-                            cast_columns(&mut local_df, self.to_cast, false)?;
-                            dfs.push((local_df, current_row_count));
-                        }
-                        Ok(dfs)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            })?;
-            let mut dfs = dfs.into_iter().flatten().collect::<Vec<_>>();
-            if self.row_count.is_some() {
-                update_row_counts(&mut dfs)
-            }
-            accumulate_dataframes_vertical(dfs.into_iter().map(|t| t.0))
-        } else {
-            // let exponential growth solve the needed size. This leads to less memory overhead
-            // in the later rechunk. Because we have large chunks they are easier reused for the
-            // large final contiguous memory needed at the end.
-            let rows_per_thread = total_rows / n_threads;
-            let max_proxy = bytes.len() / n_threads / 2;
-            let capacity = if self.low_memory {
-                chunk_size
-            } else {
-                std::cmp::min(rows_per_thread, max_proxy)
-            };
-
-            // assume 10 chars per str
-            let init_str_bytes = capacity * 10;
-            let str_capacities: Vec<_> = str_columns
-                .iter()
-                .map(|_| RunningSize::new(init_str_bytes))
-                .collect();
-
-            let mut dfs = pool.install(|| {
-                file_chunks
-                    .into_par_iter()
-                    .map(|(bytes_offset_thread, stop_at_nbytes)| {
-                        let delimiter = self.delimiter;
-                        let schema = self.schema.clone();
-                        let ignore_parser_errors = self.ignore_parser_errors;
-                        let projection = &projection;
-
-                        let mut read = bytes_offset_thread;
-                        let mut buffers = init_buffers(
-                            projection,
-                            capacity,
-                            &schema,
-                            &str_capacities,
-                            self.quote_char,
-                            self.encoding,
-                            self.ignore_parser_errors,
-                        )?;
-
-                        let mut last_read = usize::MAX;
-                        loop {
-                            if read >= stop_at_nbytes || read == last_read {
-                                break;
-                            }
-                            let local_bytes = &bytes[read..stop_at_nbytes];
-
-                            last_read = read;
-                            read += parse_lines(
-                                local_bytes,
-                                read,
-                                delimiter,
-                                self.comment_char,
-                                self.quote_char,
-                                self.null_values.as_ref(),
-                                projection,
-                                &mut buffers,
-                                ignore_parser_errors,
-                                // chunk size doesn't really matter anymore,
-                                // less calls if we increase the size
-                                usize::MAX,
-                                self.schema.len(),
-                            )?;
-                        }
-
-                        let mut df = DataFrame::new_no_checks(
-                            buffers
-                                .into_iter()
-                                .map(|buf| buf.into_series())
-                                .collect::<Result<_>>()?,
-                        );
-
-                        cast_columns(&mut df, self.to_cast, false)?;
-                        if let Some(rc) = &self.row_count {
-                            df.with_row_count_mut(&rc.name, Some(rc.offset));
-                        }
-                        let n_read = df.height() as u32;
-                        Ok((df, n_read))
-                    })
-                    .collect::<Result<Vec<_>>>()
-            })?;
-            if self.row_count.is_some() {
-                update_row_counts(&mut dfs)
-            }
-            accumulate_dataframes_vertical(dfs.into_iter().map(|t| t.0))
-        }
+        todo!()
     }
+    //     let logging = std::env::var("POLARS_VERBOSE").is_ok();
+    //     // Make the variable mutable so that we can reassign the sliced file to this variable.
+    //     let mut bytes = self.find_starting_point(bytes)?;
+
+    //     // initial row guess. We use the line statistic to guess the number of rows to allocate
+    //     let mut total_rows = 128;
+
+    //     // if None, there are less then 128 rows in the file and the statistics don't matter that much
+    //     if let Some((mean, std)) = get_line_stats(bytes, self.sample_size) {
+    //         if logging {
+    //             eprintln!("avg line length: {}\nstd. dev. line length: {}", mean, std);
+    //         }
+
+    //         // x % upper bound of byte length per line assuming normally distributed
+    //         let line_length_upper_bound = mean + 1.1 * std;
+    //         total_rows = (bytes.len() as f32 / (mean - 0.01 * std)) as usize;
+
+    //         // if we only need to parse n_rows,
+    //         // we first try to use the line statistics the total bytes we need to process
+    //         if let Some(n_rows) = self.n_rows {
+    //             total_rows = std::cmp::min(n_rows, total_rows);
+
+    //             // the guessed upper bound of  the no. of bytes in the file
+    //             let n_bytes = (line_length_upper_bound * (n_rows as f32)) as usize;
+
+    //             if n_bytes < bytes.len() {
+    //                 if let Some(pos) = next_line_position(
+    //                     &bytes[n_bytes..],
+    //                     self.schema.len(),
+    //                     self.delimiter,
+    //                     self.quote_char,
+    //                 ) {
+    //                     bytes = &bytes[..n_bytes + pos]
+    //                 }
+    //             }
+    //         }
+    //         if logging {
+    //             eprintln!("initial row estimate: {}", total_rows)
+    //         }
+    //     }
+    //     if total_rows == 128 {
+    //         n_threads = 1;
+
+    //         if logging {
+    //             eprintln!("file < 128 rows, no statistics determined")
+    //         }
+    //     }
+
+    //     // we also need to sort the projection to have predictable output.
+    //     // the `parse_lines` function expects this.
+    //     let projection = self
+    //         .projection
+    //         .take()
+    //         .map(|mut v| {
+    //             v.sort_unstable();
+    //             v
+    //         })
+    //         .unwrap_or_else(|| (0..self.schema.len()).collect());
+
+    //     let chunk_size = std::cmp::min(self.chunk_size, total_rows);
+    //     let n_chunks = total_rows / chunk_size;
+    //     if logging {
+    //         eprintln!(
+    //             "no. of chunks: {} processed by: {} threads at 1 chunk/thread",
+    //             n_chunks, n_threads
+    //         );
+    //     }
+
+    //     // keep track of the maximum capacity that needs to be allocated for the utf8-builder
+    //     // Per string column we keep a statistic of the maximum length of string bytes per chunk
+    //     // We must the names, not the indexes, (the indexes are incorrect due to projection
+    //     // pushdown)
+    //     let mut str_columns = Vec::with_capacity(projection.len());
+    //     for i in &projection {
+    //         let (name, dtype) = self.schema.get_index(*i).ok_or_else(||
+    //             PolarsError::ComputeError(
+    //                 format!("the given projection index: {} is out of bounds for csv schema with {} columns", i, self.schema.len()).into())
+    //             )?;
+
+    //         if dtype == &DataType::Utf8 {
+    //             str_columns.push(name)
+    //         }
+    //     }
+
+    //     // split the file by the nearest new line characters such that every thread processes
+    //     // approximately the same number of rows.
+    //     let file_chunks = get_file_chunks(
+    //         bytes,
+    //         n_threads,
+    //         self.schema.len(),
+    //         self.delimiter,
+    //         self.quote_char,
+    //     );
+
+    //     // If the number of threads given by the user is lower than our global thread pool we create
+    //     // new one.
+    //     let owned_pool;
+    //     let pool = if POOL.current_num_threads() != n_threads {
+    //         owned_pool = Some(
+    //             ThreadPoolBuilder::new()
+    //                 .num_threads(n_threads)
+    //                 .build()
+    //                 .unwrap(),
+    //         );
+    //         owned_pool.as_ref().unwrap()
+    //     } else {
+    //         &POOL
+    //     };
+
+    //     // all the buffers returned from the threads
+    //     // Structure:
+    //     //      the inner vec has got buffers from all the columns.
+    //     if predicate.is_some() {
+    //         // assume 10 chars per str
+    //         // this is not updated in low memory mode
+    //         let init_str_bytes = chunk_size * 10;
+    //         let str_capacities: Vec<_> = str_columns
+    //             .iter()
+    //             .map(|_| RunningSize::new(init_str_bytes))
+    //             .collect();
+
+    //         // An empty file with a schema should return an empty DataFrame with that schema
+    //         if bytes.is_empty() {
+    //             let buffers = init_buffers(
+    //                 &projection,
+    //                 0,
+    //                 &self.schema,
+    //                 &str_capacities,
+    //                 self.quote_char,
+    //                 self.encoding,
+    //                 self.ignore_parser_errors,
+    //             )?;
+    //             let df = DataFrame::new_no_checks(
+    //                 buffers
+    //                     .into_iter()
+    //                     .map(|buf| buf.into_series())
+    //                     .collect::<Result<_>>()?,
+    //             );
+    //             return Ok(df);
+    //         }
+
+    //         let dfs = pool.install(|| {
+    //             file_chunks
+    //                 .into_par_iter()
+    //                 .map(|(bytes_offset_thread, stop_at_nbytes)| {
+    //                     let delimiter = self.delimiter;
+    //                     let schema = self.schema.clone();
+    //                     let ignore_parser_errors = self.ignore_parser_errors;
+    //                     let projection = &projection;
+
+    //                     let mut read = bytes_offset_thread;
+    //                     let mut dfs = Vec::with_capacity(256);
+
+    //                     let mut last_read = usize::MAX;
+    //                     loop {
+    //                         if read >= stop_at_nbytes || read == last_read {
+    //                             break;
+    //                         }
+
+    //                         let mut buffers = init_buffers(
+    //                             projection,
+    //                             chunk_size,
+    //                             &schema,
+    //                             &str_capacities,
+    //                             self.quote_char,
+    //                             self.encoding,
+    //                             self.ignore_parser_errors,
+    //                         )?;
+
+    //                         let local_bytes = &bytes[read..stop_at_nbytes];
+
+    //                         last_read = read;
+    //                         read += parse_lines(
+    //                             local_bytes,
+    //                             read,
+    //                             delimiter,
+    //                             self.comment_char,
+    //                             self.quote_char,
+    //                             self.null_values.as_ref(),
+    //                             projection,
+    //                             &mut buffers,
+    //                             ignore_parser_errors,
+    //                             chunk_size,
+    //                             self.schema.len(),
+    //                         )?;
+
+    //                         let mut local_df = DataFrame::new_no_checks(
+    //                             buffers
+    //                                 .into_iter()
+    //                                 .map(|buf| buf.into_series())
+    //                                 .collect::<Result<_>>()?,
+    //                         );
+    //                         let current_row_count = local_df.height() as u32;
+    //                         if let Some(rc) = &self.row_count {
+    //                             local_df.with_row_count_mut(&rc.name, Some(rc.offset));
+    //                         };
+
+    //                         if let Some(predicate) = predicate {
+    //                             let s = predicate.evaluate(&local_df)?;
+    //                             let mask =
+    //                                 s.bool().expect("filter predicates was not of type boolean");
+    //                             local_df = local_df.filter(mask)?;
+    //                         }
+
+    //                         // update the running str bytes statistics
+    //                         for (str_index, name) in str_columns.iter().enumerate() {
+    //                             let ca = local_df.column(name)?.utf8()?;
+    //                             let str_bytes_len = ca.get_values_size();
+
+    //                             // don't update running statistics if we try to reduce string memory usage.
+    //                             if self.low_memory {
+    //                                 local_df.shrink_to_fit();
+    //                                 let (max, avg, last, size_hint) =
+    //                                     str_capacities[str_index].update(str_bytes_len);
+    //                                 if logging {
+    //                                     if size_hint < str_bytes_len {
+    //                                         eprintln!(
+    //                                             "probably needed to reallocate column: {}\
+    //                                 \nprevious capacity was: {}\
+    //                                 \nneeded capacity was: {}",
+    //                                             name, size_hint, str_bytes_len
+    //                                         );
+    //                                     }
+    //                                     eprintln!(
+    //                                         "column {} statistics: \nmax: {}\navg: {}\nlast: {}",
+    //                                         name, max, avg, last
+    //                                     )
+    //                                 }
+    //                             }
+    //                         }
+    //                         cast_columns(&mut local_df, self.to_cast, false)?;
+    //                         dfs.push((local_df, current_row_count));
+    //                     }
+    //                     Ok(dfs)
+    //                 })
+    //                 .collect::<Result<Vec<_>>>()
+    //         })?;
+    //         let mut dfs = dfs.into_iter().flatten().collect::<Vec<_>>();
+    //         if self.row_count.is_some() {
+    //             update_row_counts(&mut dfs)
+    //         }
+    //         accumulate_dataframes_vertical(dfs.into_iter().map(|t| t.0))
+    //     } else {
+    //         // let exponential growth solve the needed size. This leads to less memory overhead
+    //         // in the later rechunk. Because we have large chunks they are easier reused for the
+    //         // large final contiguous memory needed at the end.
+    //         let rows_per_thread = total_rows / n_threads;
+    //         let max_proxy = bytes.len() / n_threads / 2;
+    //         let capacity = if self.low_memory {
+    //             chunk_size
+    //         } else {
+    //             std::cmp::min(rows_per_thread, max_proxy)
+    //         };
+
+    //         // assume 10 chars per str
+    //         let init_str_bytes = capacity * 10;
+    //         let str_capacities: Vec<_> = str_columns
+    //             .iter()
+    //             .map(|_| RunningSize::new(init_str_bytes))
+    //             .collect();
+
+    //         let mut dfs = pool.install(|| {
+    //             file_chunks
+    //                 .into_par_iter()
+    //                 .map(|(bytes_offset_thread, stop_at_nbytes)| {
+    //                     let delimiter = self.delimiter;
+    //                     let schema = self.schema.clone();
+    //                     let ignore_parser_errors = self.ignore_parser_errors;
+    //                     let projection = &projection;
+
+    //                     let mut read = bytes_offset_thread;
+    //                     let mut buffers = init_buffers(
+    //                         projection,
+    //                         capacity,
+    //                         &schema,
+    //                         &str_capacities,
+    //                         self.quote_char,
+    //                         self.encoding,
+    //                         self.ignore_parser_errors,
+    //                     )?;
+
+    //                     let mut last_read = usize::MAX;
+    //                     loop {
+    //                         if read >= stop_at_nbytes || read == last_read {
+    //                             break;
+    //                         }
+    //                         let local_bytes = &bytes[read..stop_at_nbytes];
+
+    //                         last_read = read;
+    //                         read += parse_lines(
+    //                             local_bytes,
+    //                             read,
+    //                             delimiter,
+    //                             self.comment_char,
+    //                             self.quote_char,
+    //                             self.null_values.as_ref(),
+    //                             projection,
+    //                             &mut buffers,
+    //                             ignore_parser_errors,
+    //                             // chunk size doesn't really matter anymore,
+    //                             // less calls if we increase the size
+    //                             usize::MAX,
+    //                             self.schema.len(),
+    //                         )?;
+    //                     }
+
+    //                     let mut df = DataFrame::new_no_checks(
+    //                         buffers
+    //                             .into_iter()
+    //                             .map(|buf| buf.into_series())
+    //                             .collect::<Result<_>>()?,
+    //                     );
+
+    //                     cast_columns(&mut df, self.to_cast, false)?;
+    //                     if let Some(rc) = &self.row_count {
+    //                         df.with_row_count_mut(&rc.name, Some(rc.offset));
+    //                     }
+    //                     let n_read = df.height() as u32;
+    //                     Ok((df, n_read))
+    //                 })
+    //                 .collect::<Result<Vec<_>>>()
+    //         })?;
+    //         if self.row_count.is_some() {
+    //             update_row_counts(&mut dfs)
+    //         }
+    //         accumulate_dataframes_vertical(dfs.into_iter().map(|t| t.0))
+    //     }
+    // }
 
     /// Read the csv into a DataFrame. The predicate can come from a lazy physical plan.
     pub fn as_df(&mut self) -> Result<DataFrame> {
         let predicate = self.predicate.take();
         let aggregate = self.aggregate.take();
-        let n_threads = self.n_threads.unwrap_or_else(|| POOL.current_num_threads());
+        let n_threads = self.n_threads.unwrap_or_else(|| 1);
 
         let reader_bytes = self.reader_bytes.take().unwrap();
 

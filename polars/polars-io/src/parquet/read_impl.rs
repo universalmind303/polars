@@ -9,7 +9,7 @@ use arrow::io::parquet::read;
 use arrow::io::parquet::read::{to_deserializer, ArrayIter, FileMetaData};
 use polars_core::prelude::*;
 use polars_core::utils::accumulate_dataframes_vertical;
-use polars_core::POOL;
+// use polars_core::POOL;
 use rayon::prelude::*;
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -83,24 +83,20 @@ pub fn read_parquet<R: MmapBytesReader>(
 
         let chunk_size = md.num_rows() as usize;
         let columns = if parallel {
-            POOL.install(|| {
-                projection
-                    .par_iter()
-                    .map(|column_i| {
-                        let mut reader = Cursor::new(bytes);
-                        let field = &schema.fields[*column_i];
-                        let columns = read::read_columns(&mut reader, md.columns(), &field.name)?;
-                        let iter = to_deserializer(
-                            columns,
-                            field.clone(),
-                            remaining_rows,
-                            Some(chunk_size),
-                        )?;
+            // POOL.install(|| {
+            projection
+                .par_iter()
+                .map(|column_i| {
+                    let mut reader = Cursor::new(bytes);
+                    let field = &schema.fields[*column_i];
+                    let columns = read::read_columns(&mut reader, md.columns(), &field.name)?;
+                    let iter =
+                        to_deserializer(columns, field.clone(), remaining_rows, Some(chunk_size))?;
 
-                        array_iter_to_series(iter, field)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            })?
+                    array_iter_to_series(iter, field)
+                })
+                .collect::<Result<Vec<_>>>()?
+            // })?
         } else {
             projection
                 .iter()
