@@ -76,3 +76,34 @@ def test_apply_infer_list() -> None:
         }
     )
     assert df.select([pl.all().apply(lambda x: [x])]).dtypes == [pl.List] * 3
+
+
+def test_apply_arithmetic_consistency() -> None:
+    df = pl.DataFrame({"A": ["a", "a"], "B": [2, 3]})
+    assert df.groupby("A").agg(pl.col("B").apply(lambda x: x + 1.0))["B"].to_list() == [
+        [3.0, 4.0]
+    ]
+
+
+def test_apply_struct() -> None:
+    df = pl.DataFrame(
+        {"A": ["a", "a"], "B": [2, 3], "C": [True, False], "D": [12.0, None]}
+    )
+    out = df.with_column(pl.struct(df.columns).alias("struct")).select(
+        [
+            pl.col("struct").apply(lambda x: x["A"]).alias("A_field"),
+            pl.col("struct").apply(lambda x: x["B"]).alias("B_field"),
+            pl.col("struct").apply(lambda x: x["C"]).alias("C_field"),
+            pl.col("struct").apply(lambda x: x["D"]).alias("D_field"),
+        ]
+    )
+    expected = pl.DataFrame(
+        {
+            "A_field": ["a", "a"],
+            "B_field": [2, 3],
+            "C_field": [True, False],
+            "D_field": [12.0, None],
+        }
+    )
+
+    assert out.frame_equal(expected)

@@ -58,7 +58,7 @@ impl PyLazyGroupBy {
             // call the lambda and get a python side DataFrame wrapper
             let result_df_wrapper = match lambda.call1(py, (python_df_wrapper,)) {
                 Ok(pyobj) => pyobj,
-                Err(e) => panic!("UDF failed: {}", e.pvalue(py)),
+                Err(e) => panic!("UDF failed: {}", e.value(py)),
             };
             // unpack the wrapper in a PyDataFrame
             let py_pydf = result_df_wrapper.getattr(py, "_df").expect(
@@ -327,15 +327,23 @@ impl PyLazyFrame {
         period: &str,
         offset: &str,
         closed: Wrap<ClosedWindow>,
+        by: Vec<PyExpr>,
     ) -> PyLazyGroupBy {
         let closed_window = closed.0;
         let ldf = self.ldf.clone();
-        let lazy_gb = ldf.groupby_rolling(RollingGroupOptions {
-            index_column,
-            period: Duration::parse(period),
-            offset: Duration::parse(offset),
-            closed_window,
-        });
+        let by = by
+            .into_iter()
+            .map(|pyexpr| pyexpr.inner)
+            .collect::<Vec<_>>();
+        let lazy_gb = ldf.groupby_rolling(
+            by,
+            RollingGroupOptions {
+                index_column,
+                period: Duration::parse(period),
+                offset: Duration::parse(offset),
+                closed_window,
+            },
+        );
 
         PyLazyGroupBy { lgb: Some(lazy_gb) }
     }
@@ -630,7 +638,7 @@ impl PyLazyFrame {
             // call the lambda and get a python side Series wrapper
             let result_df_wrapper = match lambda.call1(py, (python_df_wrapper,)) {
                 Ok(pyobj) => pyobj,
-                Err(e) => panic!("UDF failed: {}", e.pvalue(py)),
+                Err(e) => panic!("UDF failed: {}", e.value(py)),
             };
             // unpack the wrapper in a PyDataFrame
             let py_pydf = result_df_wrapper.getattr(py, "_df").expect(

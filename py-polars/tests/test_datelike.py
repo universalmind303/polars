@@ -598,3 +598,108 @@ def test_asof_join_tolerance_grouper() -> None:
     )
 
     assert out.frame_equal(expected)
+
+
+def test_duration_function() -> None:
+    df = pl.DataFrame(
+        {
+            "datetime": [datetime(2022, 1, 1), datetime(2022, 1, 2)],
+            "add": [1, 2],
+        }
+    )
+
+    out = df.select(
+        [
+            (pl.col("datetime") + pl.duration(weeks="add")).alias("add_weeks"),
+            (pl.col("datetime") + pl.duration(days="add")).alias("add_days"),
+            (pl.col("datetime") + pl.duration(seconds="add")).alias("add_seconds"),
+            (pl.col("datetime") + pl.duration(milliseconds="add")).alias(
+                "add_milliseconds"
+            ),
+            (pl.col("datetime") + pl.duration(hours="add")).alias("add_hours"),
+        ]
+    )
+
+    expected = pl.DataFrame(
+        {
+            "add_weeks": [datetime(2022, 1, 8), datetime(2022, 1, 16)],
+            "add_days": [datetime(2022, 1, 2), datetime(2022, 1, 4)],
+            "add_seconds": [
+                datetime(2022, 1, 1, second=1),
+                datetime(2022, 1, 2, second=2),
+            ],
+            "add_milliseconds": [
+                datetime(2022, 1, 1, microsecond=1000),
+                datetime(2022, 1, 2, microsecond=2000),
+            ],
+            "add_hours": [datetime(2022, 1, 1, hour=1), datetime(2022, 1, 2, hour=2)],
+        }
+    )
+
+    assert out.frame_equal(expected)
+
+
+def test_rolling_groupby_by_argument() -> None:
+    df = pl.DataFrame({"times": range(10), "groups": [1] * 4 + [2] * 6})
+
+    out = df.groupby_rolling("times", "5i", by=["groups"]).agg(
+        pl.col("times").list().alias("agg_list")
+    )
+
+    expected = pl.DataFrame(
+        {
+            "groups": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2],
+            "times": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            "agg_list": [
+                [0],
+                [0, 1],
+                [0, 1, 2],
+                [0, 1, 2, 3],
+                [4],
+                [4, 5],
+                [4, 5, 6],
+                [4, 5, 6, 7],
+                [4, 5, 6, 7, 8],
+                [5, 6, 7, 8, 9],
+            ],
+        }
+    )
+
+    assert out.frame_equal(expected)
+
+
+def test_groupby_rolling_mean_3020() -> None:
+    df = pl.DataFrame(
+        {
+            "Date": [
+                "1998-04-12",
+                "1998-04-19",
+                "1998-04-26",
+                "1998-05-03",
+                "1998-05-10",
+                "1998-05-17",
+                "1998-05-24",
+            ],
+            "val": range(7),
+        }
+    ).with_column(pl.col("Date").str.strptime(pl.Date))
+    assert (
+        df.groupby_rolling(index_column="Date", period="1w")
+        .agg(pl.col("val").mean().alias("val_mean"))
+        .frame_equal(
+            pl.DataFrame(
+                {
+                    "Date": [
+                        date(1998, 4, 12),
+                        date(1998, 4, 19),
+                        date(1998, 4, 26),
+                        date(1998, 5, 3),
+                        date(1998, 5, 10),
+                        date(1998, 5, 17),
+                        date(1998, 5, 24),
+                    ],
+                    "val_mean": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+                }
+            )
+        )
+    )

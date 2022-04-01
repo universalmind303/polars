@@ -560,17 +560,13 @@ impl<'a> ALogicalPlanBuilder<'a> {
     pub fn project_local(self, exprs: Vec<Node>) -> Self {
         let input_schema = self.lp_arena.get(self.root).schema(self.lp_arena);
         let schema = aexprs_to_schema(&exprs, input_schema, Context::Default, self.expr_arena);
-        if !exprs.is_empty() {
-            let lp = ALogicalPlan::LocalProjection {
-                expr: exprs,
-                input: self.root,
-                schema: Arc::new(schema),
-            };
-            let node = self.lp_arena.add(lp);
-            ALogicalPlanBuilder::new(node, self.expr_arena, self.lp_arena)
-        } else {
-            self
-        }
+        let lp = ALogicalPlan::LocalProjection {
+            expr: exprs,
+            input: self.root,
+            schema: Arc::new(schema),
+        };
+        let node = self.lp_arena.add(lp);
+        ALogicalPlanBuilder::new(node, self.expr_arena, self.lp_arena)
     }
 
     pub fn project(self, exprs: Vec<Node>) -> Self {
@@ -634,7 +630,6 @@ impl<'a> ALogicalPlanBuilder<'a> {
         maintain_order: bool,
         options: GroupbyOptions,
     ) -> Self {
-        debug_assert!(!(keys.is_empty() && options.dynamic.is_none()));
         let current_schema = self.schema();
         // TODO! add this line if LogicalPlan is dropped in favor of ALogicalPlan
         // let aggs = rewrite_projections(aggs, current_schema);
@@ -642,6 +637,21 @@ impl<'a> ALogicalPlanBuilder<'a> {
         let mut schema = aexprs_to_schema(&keys, current_schema, Context::Default, self.expr_arena);
         let other = aexprs_to_schema(&aggs, current_schema, Context::Aggregation, self.expr_arena);
         schema.merge(other);
+
+        let index_columns = &[
+            options
+                .rolling
+                .as_ref()
+                .map(|options| &options.index_column),
+            options
+                .dynamic
+                .as_ref()
+                .map(|options| &options.index_column),
+        ];
+        for &name in index_columns.iter().flatten() {
+            let dtype = current_schema.get(name).unwrap();
+            schema.with_column(name.clone(), dtype.clone());
+        }
 
         let lp = ALogicalPlan::Aggregate {
             input: self.root,

@@ -212,16 +212,12 @@ impl LogicalPlanBuilder {
     pub fn project_local(self, exprs: Vec<Expr>) -> Self {
         let (exprs, schema) =
             try_delayed!(prepare_projection(exprs, self.0.schema()), &self.0, into);
-        if !exprs.is_empty() {
-            LogicalPlan::LocalProjection {
-                expr: exprs,
-                input: Box::new(self.0),
-                schema: Arc::new(schema),
-            }
-            .into()
-        } else {
-            self
+        LogicalPlan::LocalProjection {
+            expr: exprs,
+            input: Box::new(self.0),
+            schema: Arc::new(schema),
         }
+        .into()
     }
 
     pub fn fill_null(self, fill_value: Expr) -> Self {
@@ -274,7 +270,9 @@ impl LogicalPlanBuilder {
 
     /// Apply a filter
     pub fn filter(self, predicate: Expr) -> Self {
-        let predicate = if has_expr(&predicate, |e| matches!(e, Expr::Wildcard)) {
+        let predicate = if has_expr(&predicate, |e| {
+            matches!(e, Expr::Wildcard | Expr::RenameAlias { .. })
+        }) {
             let rewritten = rewrite_projections(vec![predicate], self.0.schema(), &[]);
             combine_predicates_expr(rewritten.into_iter())
         } else {
@@ -310,6 +308,25 @@ impl LogicalPlanBuilder {
             into
         );
         schema.merge(other);
+
+        let index_columns = &[
+            rolling_options
+                .as_ref()
+                .map(|options| &options.index_column),
+            dynamic_options
+                .as_ref()
+                .map(|options| &options.index_column),
+        ];
+        for &name in index_columns.iter().flatten() {
+            let dtype = try_delayed!(
+                current_schema
+                    .get(name)
+                    .ok_or_else(|| PolarsError::NotFound(name.clone())),
+                self.0,
+                into
+            );
+            schema.with_column(name.clone(), dtype.clone());
+        }
 
         LogicalPlan::Aggregate {
             input: Box::new(self.0),

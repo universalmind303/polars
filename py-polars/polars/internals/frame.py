@@ -66,6 +66,7 @@ from polars.datatypes import Boolean, DataType, UInt32, Utf8, py_type_to_dtype
 from polars.utils import (
     _prepare_row_count_args,
     _process_null_values,
+    format_path,
     handle_projection_columns,
     is_int_sequence,
     is_str_sequence,
@@ -459,7 +460,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
     @classmethod
     def _read_csv(
         cls: Type[DF],
-        file: Union[str, BinaryIO, bytes],
+        file: Union[str, Path, BinaryIO, bytes],
         has_header: bool = True,
         columns: Optional[Union[List[int], List[str]]] = None,
         sep: str = ",",
@@ -489,8 +490,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         self = cls.__new__(cls)
 
         path: Optional[str]
-        if isinstance(file, str):
-            path = file
+        if isinstance(file, (str, Path)):
+            path = format_path(file)
         else:
             path = None
             if isinstance(file, BytesIO):
@@ -581,7 +582,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
     @classmethod
     def _read_parquet(
         cls: Type[DF],
-        file: Union[str, BinaryIO],
+        file: Union[str, Path, BinaryIO],
         columns: Optional[Union[List[int], List[str]]] = None,
         n_rows: Optional[int] = None,
         parallel: bool = True,
@@ -602,6 +603,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         parallel
             Read the parquet file in parallel. The single threaded reader consumes less memory.
         """
+        if isinstance(file, (str, Path)):
+            file = format_path(file)
         if isinstance(file, str) and "*" in file:
             from polars import scan_parquet
 
@@ -638,7 +641,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
     @classmethod
     def _read_avro(
         cls: Type[DF],
-        file: Union[str, BinaryIO],
+        file: Union[str, Path, BinaryIO],
         columns: Optional[Union[List[int], List[str]]] = None,
         n_rows: Optional[int] = None,
     ) -> DF:
@@ -656,6 +659,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         -------
         DataFrame
         """
+        if isinstance(file, (str, Path)):
+            file = format_path(file)
         projection, columns = handle_projection_columns(columns)
         self = cls.__new__(cls)
         self._df = PyDataFrame.read_avro(file, columns, projection, n_rows)
@@ -664,7 +669,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
     @classmethod
     def _read_ipc(
         cls: Type[DF],
-        file: Union[str, BinaryIO],
+        file: Union[str, Path, BinaryIO],
         columns: Optional[Union[List[int], List[str]]] = None,
         n_rows: Optional[int] = None,
         row_count_name: Optional[str] = None,
@@ -687,6 +692,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         DataFrame
         """
 
+        if isinstance(file, (str, Path)):
+            file = format_path(file)
         if isinstance(file, str) and "*" in file:
             from polars import scan_ipc
 
@@ -720,7 +727,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
     @classmethod
     def _read_json(
         cls: Type[DF],
-        file: Union[str, IOBase],
+        file: Union[str, Path, IOBase],
         json_lines: bool = False,
     ) -> DF:
         """
@@ -728,6 +735,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         """
         if isinstance(file, StringIO):
             file = BytesIO(file.getvalue().encode())
+        elif isinstance(file, (str, Path)):
+            file = format_path(file)
 
         self = cls.__new__(cls)
         self._df = PyDataFrame.read_json(file, json_lines)
@@ -973,6 +982,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         to_string
             Ignore file argument and return a string.
         """
+        if isinstance(file, (str, Path)):
+            file = format_path(file)
         to_string_io = (file is not None) and isinstance(file, StringIO)
         if to_string or file is None or to_string_io:
             with BytesIO() as buf:
@@ -1067,8 +1078,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
             self._df.to_csv(buffer, has_header, ord(sep), ord(quote))
             return str(buffer.getvalue(), encoding="utf-8")
 
-        if isinstance(file, Path):
-            file = str(file)
+        if isinstance(file, (str, Path)):
+            file = format_path(file)
 
         self._df.to_csv(file, has_header, ord(sep), ord(quote))
         return None
@@ -1104,8 +1115,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
                 - "snappy"
                 - "deflate"
         """
-        if isinstance(file, Path):
-            file = str(file)
+        if isinstance(file, (str, Path)):
+            file = format_path(file)
 
         self._df.to_avro(file, compression)
 
@@ -1141,8 +1152,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         """
         if compression is None:
             compression = "uncompressed"
-        if isinstance(file, Path):
-            file = str(file)
+        if isinstance(file, (str, Path)):
+            file = format_path(file)
 
         self._df.to_ipc(file, compression)
 
@@ -1159,6 +1170,12 @@ class DataFrame(metaclass=DataFrameMetaClass):
         return self.write_ipc(file, compression)
 
     def to_dicts(self) -> List[Dict[str, Any]]:
+        """
+        Convert every row to a dictionary.
+
+        Note that this is slow.
+        """
+
         pydf = self._df
         names = self.columns
 
@@ -1316,8 +1333,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         """
         if compression is None:
             compression = "uncompressed"
-        if isinstance(file, Path):
-            file = str(file)
+        if isinstance(file, (str, Path)):
+            file = format_path(file)
 
         if use_pyarrow:
             if not _PYARROW_AVAILABLE:
@@ -2685,6 +2702,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
         period: str,
         offset: Optional[str] = None,
         closed: str = "right",
+        by: Optional[Union[str, List[str], "pli.Expr", List["pli.Expr"]]] = None,
     ) -> "RollingGroupBy[DF]":
         """
         Create rolling groups based on a time column (or index value of type Int32, Int64).
@@ -2736,6 +2754,8 @@ class DataFrame(metaclass=DataFrameMetaClass):
         closed
             Defines if the window interval is closed or not.
             Any of {"left", "right", "both" "none"}
+        by
+            Also group by this column/these columns
 
         Examples
         --------
@@ -2783,13 +2803,7 @@ class DataFrame(metaclass=DataFrameMetaClass):
 
         """
 
-        return RollingGroupBy(
-            self,
-            index_column,
-            period,
-            offset,
-            closed,
-        )
+        return RollingGroupBy(self, index_column, period, offset, closed, by)
 
     def groupby_dynamic(
         self,
@@ -5090,12 +5104,14 @@ class RollingGroupBy(Generic[DF]):
         period: str,
         offset: Optional[str],
         closed: str = "none",
+        by: Optional[Union[str, List[str], "pli.Expr", List["pli.Expr"]]] = None,
     ):
         self.df = df
         self.time_column = index_column
         self.period = period
         self.offset = offset
         self.closed = closed
+        self.by = by
 
     def agg(
         self,
@@ -5109,10 +5125,7 @@ class RollingGroupBy(Generic[DF]):
         return (
             self.df.lazy()
             .groupby_rolling(
-                self.time_column,
-                self.period,
-                self.offset,
-                self.closed,
+                self.time_column, self.period, self.offset, self.closed, self.by
             )
             .agg(column_to_agg)  # type: ignore[arg-type]
             .collect(no_optimization=True, string_cache=False)
