@@ -24,12 +24,10 @@ impl ApplyExpr {
         groups: &'a GroupsProxy,
         state: &ExecutionState,
     ) -> Result<Vec<AggregationContext<'a>>> {
-        POOL.install(|| {
-            self.inputs
-                .par_iter()
-                .map(|e| e.evaluate_on_groups(df, groups, state))
-                .collect()
-        })
+        self.inputs
+            .par_iter()
+            .map(|e| e.evaluate_on_groups(df, groups, state))
+            .collect()
     }
 
     fn finish_apply_groups<'a>(

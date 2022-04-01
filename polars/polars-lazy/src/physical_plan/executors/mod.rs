@@ -136,12 +136,10 @@ pub(crate) fn evaluate_physical_expressions(
     let selected_columns = if has_windows {
         execute_projection_cached_window_fns(df, exprs, state)?
     } else {
-        POOL.install(|| {
-            exprs
-                .par_iter()
-                .map(|expr| expr.evaluate(df, state))
-                .collect::<Result<_>>()
-        })?
+        exprs
+            .par_iter()
+            .map(|expr| expr.evaluate(df, state))
+            .collect::<Result<_>>()?
     };
     state.clear_schema_cache();
 

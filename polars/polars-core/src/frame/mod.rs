@@ -1378,20 +1378,18 @@ impl DataFrame {
 
         let masks = split_ca(mask, n_threads).unwrap();
         let dfs = split_df(self, n_threads).unwrap();
-        let dfs: Result<Vec<_>> = POOL.install(|| {
-            masks
-                .par_iter()
-                .zip(dfs)
-                .map(|(mask, df)| {
-                    let cols = df
-                        .columns
-                        .iter()
-                        .map(|s| s.filter(mask))
-                        .collect::<Result<_>>()?;
-                    Ok(DataFrame::new_no_checks(cols))
-                })
-                .collect()
-        });
+        let dfs: Result<Vec<_>> = masks
+            .par_iter()
+            .zip(dfs)
+            .map(|(mask, df)| {
+                let cols = df
+                    .columns
+                    .iter()
+                    .map(|s| s.filter(mask))
+                    .collect::<Result<_>>()?;
+                Ok(DataFrame::new_no_checks(cols))
+            })
+            .collect();
 
         let mut iter = dfs?.into_iter();
         let first = iter.next().unwrap();
@@ -1417,15 +1415,14 @@ impl DataFrame {
             return self.filter_vertical(mask);
         }
 
-        let new_col = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| match s.dtype() {
-                    DataType::Utf8 => s.filter_threaded(mask, true),
-                    _ => s.filter(mask),
-                })
-                .collect::<Result<Vec<_>>>()
-        })?;
+        let new_col = self
+            .columns
+            .par_iter()
+            .map(|s| match s.dtype() {
+                DataType::Utf8 => s.filter_threaded(mask, true),
+                _ => s.filter(mask),
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(DataFrame::new_no_checks(new_col))
     }
 
@@ -1444,15 +1441,14 @@ impl DataFrame {
     where
         I: Iterator<Item = usize> + Clone + Sync + TrustedLen,
     {
-        let new_col = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| {
-                    let mut i = iter.clone();
-                    s.take_iter(&mut i)
-                })
-                .collect::<Result<_>>()
-        })?;
+        let new_col = self
+            .columns
+            .par_iter()
+            .map(|s| {
+                let mut i = iter.clone();
+                s.take_iter(&mut i)
+            })
+            .collect::<Result<_>>()?;
         Ok(DataFrame::new_no_checks(new_col))
     }
 
@@ -1492,15 +1488,13 @@ impl DataFrame {
                 .map(|s| s.take_iter_unchecked(&mut iter))
                 .collect::<Vec<_>>()
         } else {
-            POOL.install(|| {
-                self.columns
-                    .par_iter()
-                    .map(|s| {
-                        let mut i = iter.clone();
-                        s.take_iter_unchecked(&mut i)
-                    })
-                    .collect::<Vec<_>>()
-            })
+            self.columns
+                .par_iter()
+                .map(|s| {
+                    let mut i = iter.clone();
+                    s.take_iter_unchecked(&mut i)
+                })
+                .collect::<Vec<_>>()
         };
         DataFrame::new_no_checks(new_col)
     }
@@ -1548,15 +1542,13 @@ impl DataFrame {
                 .map(|s| s.take_opt_iter_unchecked(&mut iter))
                 .collect::<Vec<_>>()
         } else {
-            POOL.install(|| {
-                self.columns
-                    .par_iter()
-                    .map(|s| {
-                        let mut i = iter.clone();
-                        s.take_opt_iter_unchecked(&mut i)
-                    })
-                    .collect::<Vec<_>>()
-            })
+            self.columns
+                .par_iter()
+                .map(|s| {
+                    let mut i = iter.clone();
+                    s.take_opt_iter_unchecked(&mut i)
+                })
+                .collect::<Vec<_>>()
         };
 
         DataFrame::new_no_checks(new_col)
@@ -1579,15 +1571,14 @@ impl DataFrame {
         } else {
             Cow::Borrowed(indices)
         };
-        let new_col = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| match s.dtype() {
-                    DataType::Utf8 => s.take_threaded(&indices, true),
-                    _ => s.take(&indices),
-                })
-                .collect::<Result<_>>()
-        })?;
+        let new_col = self
+            .columns
+            .par_iter()
+            .map(|s| match s.dtype() {
+                DataType::Utf8 => s.take_threaded(&indices, true),
+                _ => s.take(&indices),
+            })
+            .collect::<Result<_>>()?;
 
         Ok(DataFrame::new_no_checks(new_col))
     }
@@ -1598,15 +1589,14 @@ impl DataFrame {
     }
 
     pub(crate) unsafe fn take_unchecked(&self, idx: &IdxCa) -> Self {
-        let cols = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| match s.dtype() {
-                    DataType::Utf8 => s.take_unchecked_threaded(idx, true).unwrap(),
-                    _ => s.take_unchecked(idx).unwrap(),
-                })
-                .collect()
-        });
+        let cols = self
+            .columns
+            .par_iter()
+            .map(|s| match s.dtype() {
+                DataType::Utf8 => s.take_unchecked_threaded(idx, true).unwrap(),
+                _ => s.take_unchecked(idx).unwrap(),
+            })
+            .collect();
         DataFrame::new_no_checks(cols)
     }
 
@@ -1614,18 +1604,17 @@ impl DataFrame {
         let n_threads = POOL.current_num_threads();
         let idxs = split_ca(indices, n_threads).unwrap();
 
-        let dfs: Vec<_> = POOL.install(|| {
-            idxs.par_iter()
-                .map(|idx| {
-                    let cols = self
-                        .columns
-                        .iter()
-                        .map(|s| s.take_unchecked(idx).unwrap())
-                        .collect();
-                    DataFrame::new_no_checks(cols)
-                })
-                .collect()
-        });
+        let dfs: Vec<_> = idxs
+            .par_iter()
+            .map(|idx| {
+                let cols = self
+                    .columns
+                    .iter()
+                    .map(|s| s.take_unchecked(idx).unwrap())
+                    .collect();
+                DataFrame::new_no_checks(cols)
+            })
+            .collect();
 
         let mut iter = dfs.into_iter();
         let first = iter.next().unwrap();
@@ -2228,7 +2217,7 @@ impl DataFrame {
     /// See the method on [Series](../series/enum.Series.html#method.shift) for more info on the `shift` operation.
     #[must_use]
     pub fn shift(&self, periods: i64) -> Self {
-        let col = POOL.install(|| self.columns.par_iter().map(|s| s.shift(periods)).collect());
+        let col = self.columns.par_iter().map(|s| s.shift(periods)).collect();
         DataFrame::new_no_checks(col)
     }
 
@@ -2241,12 +2230,11 @@ impl DataFrame {
     ///
     /// See the method on [Series](../series/enum.Series.html#method.fill_null) for more info on the `fill_null` operation.
     pub fn fill_null(&self, strategy: FillNullStrategy) -> Result<Self> {
-        let col = POOL.install(|| {
-            self.columns
-                .par_iter()
-                .map(|s| s.fill_null(strategy))
-                .collect::<Result<Vec<_>>>()
-        })?;
+        let col = self
+            .columns
+            .par_iter()
+            .map(|s| s.fill_null(strategy))
+            .collect::<Result<Vec<_>>>()?;
         Ok(DataFrame::new_no_checks(col))
     }
 

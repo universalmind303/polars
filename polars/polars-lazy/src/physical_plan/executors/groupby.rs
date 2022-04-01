@@ -144,8 +144,7 @@ fn run_partitions(
     // split on several threads. Than the final result we apply the same groupby again.
     let dfs = split_df(df, n_threads)?;
 
-    POOL.install(|| {
-        dfs.into_par_iter()
+    dfs.into_par_iter()
             .map(|df| {
                 let key = exec.key.evaluate(&df, state)?;
                 let phys_aggs = &exec.phys_aggs;
@@ -175,7 +174,7 @@ fn run_partitions(
                 let df = DataFrame::new_no_checks(columns);
                 Ok(df)
             })
-    }).collect()
+    .collect()
 }
 
 #[allow(clippy::type_complexity)]
@@ -324,8 +323,7 @@ impl Executor for PartitionGroupByExec {
                 .flatten()
                 .collect()
         };
-        let (mut columns, agg_columns): (Vec<_>, Vec<_>) =
-            POOL.install(|| rayon::join(get_columns, get_agg));
+        let (mut columns, agg_columns): (Vec<_>, Vec<_>) = rayon::join(get_columns, get_agg);
 
         columns.extend(agg_columns);
         state.clear_schema_cache();

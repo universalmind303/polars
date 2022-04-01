@@ -139,88 +139,83 @@ impl DataFrame {
         // make sure that we make smaller dataframes then the take operations are cheaper
         let mut index_df = self.select(index)?;
 
-        let im_result = POOL.install(|| {
-            groups
-                .par_iter()
-                .map(|indicator| {
-                    // Here we do a nested group by.
-                    // Everything we do here produces a single row in the final dataframe
+        let im_result = groups
+            .par_iter()
+            .map(|indicator| {
+                // Here we do a nested group by.
+                // Everything we do here produces a single row in the final dataframe
 
-                    // nested group by keys
+                // nested group by keys
 
+                // safety:
+                // group tuples are in bounds
+                // shape (1, len(keys)
+                let sub_index_df = match indicator {
+                    GroupsIndicator::Idx(g) => unsafe { index_df.take_unchecked_slice(&g.1[..1]) },
+                    GroupsIndicator::Slice([first, len]) => {
+                        index_df.slice(first as i64, len as usize)
+                    }
+                };
+
+                // in `im_result` we store the intermediate results
+                // The first dataframe in the vec is the index dataframe (a single row)
+                // The rest of the dataframes in `im_result` are the aggregation results (they still have to be pivoted)
+                let mut im_result = Vec::with_capacity(columns.len());
+                im_result.push(sub_index_df);
+
+                // for every column we compute aggregates we do this branch
+                for (i, column) in columns.iter().enumerate() {
+                    // Here we do another groupby where
+                    // - `columns` are the keys
+                    // - `values` are the aggregation results
+
+                    // this yields:
+                    // keys  | values
+                    // key_1  | agg_result_1
+                    // key_2  | agg_result_2
+                    // key_n  | agg_result_n
+
+                    // which later must be transposed to
+                    //
+                    // header: key_1, key_2, key_n
+                    //        agg_1, agg_2, agg_3
                     // safety:
                     // group tuples are in bounds
-                    // shape (1, len(keys)
-                    let sub_index_df = match indicator {
+                    let sub_vals_and_cols = match indicator {
                         GroupsIndicator::Idx(g) => unsafe {
-                            index_df.take_unchecked_slice(&g.1[..1])
+                            values_and_columns[i].take_unchecked_slice(g.1)
                         },
                         GroupsIndicator::Slice([first, len]) => {
-                            index_df.slice(first as i64, len as usize)
+                            values_and_columns[i].slice(first as i64, len as usize)
                         }
                     };
 
-                    // in `im_result` we store the intermediate results
-                    // The first dataframe in the vec is the index dataframe (a single row)
-                    // The rest of the dataframes in `im_result` are the aggregation results (they still have to be pivoted)
-                    let mut im_result = Vec::with_capacity(columns.len());
-                    im_result.push(sub_index_df);
+                    let s = sub_vals_and_cols.column(column).unwrap().clone();
+                    let gb = sub_vals_and_cols
+                        .groupby_with_series(vec![s], false, false)
+                        .unwrap();
 
-                    // for every column we compute aggregates we do this branch
-                    for (i, column) in columns.iter().enumerate() {
-                        // Here we do another groupby where
-                        // - `columns` are the keys
-                        // - `values` are the aggregation results
+                    use PivotAgg::*;
+                    let mut df_result = match agg_fn {
+                        Sum => gb.sum().unwrap(),
+                        Min => gb.min().unwrap(),
+                        Max => gb.max().unwrap(),
+                        Mean => gb.mean().unwrap(),
+                        Median => gb.median().unwrap(),
+                        First => gb.first().unwrap(),
+                        Count => gb.count().unwrap(),
+                        Last => gb.last().unwrap(),
+                    };
 
-                        // this yields:
-                        // keys  | values
-                        // key_1  | agg_result_1
-                        // key_2  | agg_result_2
-                        // key_n  | agg_result_n
+                    // make sure we keep the original names
+                    df_result.columns[1].rename(&values[i]);
 
-                        // which later must be transposed to
-                        //
-                        // header: key_1, key_2, key_n
-                        //        agg_1, agg_2, agg_3
-
-                        // safety:
-                        // group tuples are in bounds
-                        let sub_vals_and_cols = match indicator {
-                            GroupsIndicator::Idx(g) => unsafe {
-                                values_and_columns[i].take_unchecked_slice(g.1)
-                            },
-                            GroupsIndicator::Slice([first, len]) => {
-                                values_and_columns[i].slice(first as i64, len as usize)
-                            }
-                        };
-
-                        let s = sub_vals_and_cols.column(column).unwrap().clone();
-                        let gb = sub_vals_and_cols
-                            .groupby_with_series(vec![s], false, false)
-                            .unwrap();
-
-                        use PivotAgg::*;
-                        let mut df_result = match agg_fn {
-                            Sum => gb.sum().unwrap(),
-                            Min => gb.min().unwrap(),
-                            Max => gb.max().unwrap(),
-                            Mean => gb.mean().unwrap(),
-                            Median => gb.median().unwrap(),
-                            First => gb.first().unwrap(),
-                            Count => gb.count().unwrap(),
-                            Last => gb.last().unwrap(),
-                        };
-
-                        // make sure we keep the original names
-                        df_result.columns[1].rename(&values[i]);
-
-                        // store the results and transpose them later
-                        im_result.push(df_result);
-                    }
-                    im_result
-                })
-                .collect::<Vec<_>>()
-        });
+                    // store the results and transpose them later
+                    im_result.push(df_result);
+                }
+                im_result
+            })
+            .collect::<Vec<_>>();
         // Now we have a lot of small DataFrames with aggregation results
         // we must map the results to the right column. This requires a hashmap
 
@@ -237,23 +232,21 @@ impl DataFrame {
 
                 // Join every row with the unique column. This join is needed because some rows don't have all values and we want to have
                 // nulls there.
-                let result_columns = POOL.install(|| {
-                    im_result
-                        .par_iter()
-                        .map(|im_r| {
-                            // we offset 1 because the first is the group index (can be removed?)
-                            let current_result = &im_r[column_index + 1];
-                            let key = &current_result.get_columns()[0];
-                            let tuples = unique_vals.hash_join_left(key);
-                            let mut iter = tuples.iter().map(|t| t.1.map(|i| i as usize));
+                let result_columns = im_result
+                    .par_iter()
+                    .map(|im_r| {
+                        // we offset 1 because the first is the group index (can be removed?)
+                        let current_result = &im_r[column_index + 1];
+                        let key = &current_result.get_columns()[0];
+                        let tuples = unique_vals.hash_join_left(key);
+                        let mut iter = tuples.iter().map(|t| t.1.map(|i| i as usize));
 
-                            let values = &current_result.get_columns()[1];
-                            // Safety
-                            // join tuples are in bounds
-                            unsafe { values.take_opt_iter_unchecked(&mut iter) }
-                        })
-                        .collect::<Vec<_>>()
-                });
+                        let values = &current_result.get_columns()[1];
+                        // Safety
+                        // join tuples are in bounds
+                        unsafe { values.take_opt_iter_unchecked(&mut iter) }
+                    })
+                    .collect::<Vec<_>>();
                 let results = DataFrame::new_no_checks(result_columns);
 
                 let mut dtype = self
