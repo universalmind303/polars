@@ -355,7 +355,7 @@ impl DataFrame {
     /// Aggregate all the chunks in the DataFrame to a single chunk in parallel.
     /// This may lead to more peak memory consumption.
     pub fn as_single_chunk_par(&mut self) -> &mut Self {
-        self.columns = POOL.install(|| self.columns.par_iter().map(|s| s.rechunk()).collect());
+        self.columns = self.columns.par_iter().map(|s| s.rechunk()).collect();
         self
     }
 

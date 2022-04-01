@@ -416,8 +416,9 @@ where
     // We will create a hashtable in every thread.
     // We use the hash to partition the keys to the matching hashtable.
     // Every thread traverses all keys/hashes and ignores the ones that doesn't fall in that partition.
-    POOL.install(|| {
-        (0..n_partitions).into_par_iter().map(|partition_no| {
+    (0..n_partitions)
+        .into_par_iter()
+        .map(|partition_no| {
             let build_hasher = build_hasher.clone();
             let hashes_and_keys = &hashes_and_keys;
             let partition_no = partition_no as u64;
@@ -458,8 +459,7 @@ where
             }
             hash_tbl
         })
-    })
-    .collect()
+        .collect()
 }
 
 pub(crate) fn create_hash_and_keys_threaded_vectorized<I, T>(
@@ -472,21 +472,19 @@ where
     T: Send + Hash + Eq,
 {
     let build_hasher = build_hasher.unwrap_or_default();
-    let hashes = POOL.install(|| {
-        iters
-            .into_par_iter()
-            .map(|iter| {
-                // create hashes and keys
-                iter.into_iter()
-                    .map(|val| {
-                        let mut hasher = build_hasher.build_hasher();
-                        val.hash(&mut hasher);
-                        (hasher.finish(), val)
-                    })
-                    .collect_trusted::<Vec<_>>()
-            })
-            .collect()
-    });
+    let hashes = iters
+        .into_par_iter()
+        .map(|iter| {
+            // create hashes and keys
+            iter.into_iter()
+                .map(|val| {
+                    let mut hasher = build_hasher.build_hasher();
+                    val.hash(&mut hasher);
+                    (hasher.finish(), val)
+                })
+                .collect_trusted::<Vec<_>>()
+        })
+        .collect();
     (hashes, build_hasher)
 }
 
@@ -502,15 +500,14 @@ pub(crate) fn df_rows_to_hashes_threaded(
 ) -> (Vec<UInt64Chunked>, RandomState) {
     let hasher_builder = hasher_builder.unwrap_or_default();
 
-    let hashes = POOL.install(|| {
-        keys.into_par_iter()
-            .map(|df| {
-                let hb = hasher_builder.clone();
-                let (ca, _) = df_rows_to_hashes(df, Some(hb));
-                ca
-            })
-            .collect()
-    });
+    let hashes = keys
+        .into_par_iter()
+        .map(|df| {
+            let hb = hasher_builder.clone();
+            let (ca, _) = df_rows_to_hashes(df, Some(hb));
+            ca
+        })
+        .collect();
     (hashes, hasher_builder)
 }
 

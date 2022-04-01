@@ -97,51 +97,50 @@ where
     // We will create a hashtable in every thread.
     // We use the hash to partition the keys to the matching hashtable.
     // Every thread traverses all keys/hashes and ignores the ones that doesn't fall in that partition.
-    let out = POOL
-        .install(|| {
-            (0..n_partitions).into_par_iter().map(|thread_no| {
-                let thread_no = thread_no as u64;
+    let out = (0..n_partitions)
+        .into_par_iter()
+        .map(|thread_no| {
+            let thread_no = thread_no as u64;
 
-                let mut hash_tbl: PlHashMap<T, (IdxSize, Vec<IdxSize>)> =
-                    PlHashMap::with_capacity(HASHMAP_INIT_SIZE);
+            let mut hash_tbl: PlHashMap<T, (IdxSize, Vec<IdxSize>)> =
+                PlHashMap::with_capacity(HASHMAP_INIT_SIZE);
 
-                let mut offset = 0;
-                for keys in &keys {
-                    let keys = keys.as_ref();
-                    let len = keys.len() as IdxSize;
-                    let hasher = hash_tbl.hasher().clone();
+            let mut offset = 0;
+            for keys in &keys {
+                let keys = keys.as_ref();
+                let len = keys.len() as IdxSize;
+                let hasher = hash_tbl.hasher().clone();
 
-                    let mut cnt = 0;
-                    keys.iter().for_each(|k| {
-                        let idx = cnt + offset;
-                        cnt += 1;
+                let mut cnt = 0;
+                keys.iter().for_each(|k| {
+                    let idx = cnt + offset;
+                    cnt += 1;
 
-                        if this_partition(k.as_u64(), thread_no, n_partitions) {
-                            let hash = T::get_hash(k, &hasher);
-                            let entry = hash_tbl.raw_entry_mut().from_key_hashed_nocheck(hash, k);
+                    if this_partition(k.as_u64(), thread_no, n_partitions) {
+                        let hash = T::get_hash(k, &hasher);
+                        let entry = hash_tbl.raw_entry_mut().from_key_hashed_nocheck(hash, k);
 
-                            match entry {
-                                RawEntryMut::Vacant(entry) => {
-                                    let mut tuples = Vec::with_capacity(group_size_hint);
-                                    tuples.push(idx);
-                                    entry.insert_with_hasher(hash, *k, (idx, tuples), |k| {
-                                        T::get_hash(k, &hasher)
-                                    });
-                                }
-                                RawEntryMut::Occupied(mut entry) => {
-                                    let v = entry.get_mut();
-                                    v.1.push(idx);
-                                }
+                        match entry {
+                            RawEntryMut::Vacant(entry) => {
+                                let mut tuples = Vec::with_capacity(group_size_hint);
+                                tuples.push(idx);
+                                entry.insert_with_hasher(hash, *k, (idx, tuples), |k| {
+                                    T::get_hash(k, &hasher)
+                                });
+                            }
+                            RawEntryMut::Occupied(mut entry) => {
+                                let v = entry.get_mut();
+                                v.1.push(idx);
                             }
                         }
-                    });
-                    offset += len;
-                }
-                hash_tbl
-                    .into_iter()
-                    .map(|(_k, v)| v)
-                    .collect_trusted::<Vec<_>>()
-            })
+                    }
+                });
+                offset += len;
+            }
+            hash_tbl
+                .into_iter()
+                .map(|(_k, v)| v)
+                .collect_trusted::<Vec<_>>()
         })
         .collect::<Vec<_>>();
     finish_group_order(out, sorted)

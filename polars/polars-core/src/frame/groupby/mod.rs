@@ -46,20 +46,17 @@ impl DataFrame {
                 // otherwise we use two bits of this byte to represent null values.
                 let splits = split_offsets($ca0.len(), n_partitions);
 
-                let keys = POOL.install(|| {
-                    splits
-                        .into_par_iter()
-                        .map(|(offset, len)| {
-                            let ca0 = $ca0.slice(offset as i64, len);
-                            let ca1 = $ca1.slice(offset as i64, len);
-                            ca0.into_iter()
-                                .zip(ca1.into_iter())
-                                .map(|(l, r)| $pack_fn(l, r))
-                                .collect_trusted::<Vec<_>>()
-                        })
-                        .collect::<Vec<_>>()
-                });
-
+                let keys = splits
+                    .into_par_iter()
+                    .map(|(offset, len)| {
+                        let ca0 = $ca0.slice(offset as i64, len);
+                        let ca1 = $ca1.slice(offset as i64, len);
+                        ca0.into_iter()
+                            .zip(ca1.into_iter())
+                            .map(|(l, r)| $pack_fn(l, r))
+                            .collect_trusted::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
                 return Ok(GroupBy::new(
                     self,
                     by,

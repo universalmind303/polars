@@ -42,7 +42,7 @@ impl PhysicalExpr for FilterExpr {
         let ac_s_f = || self.input.evaluate_on_groups(df, groups, state);
         let ac_predicate_f = || self.by.evaluate_on_groups(df, groups, state);
 
-        let (ac_s, ac_predicate) = POOL.install(|| rayon::join(ac_s_f, ac_predicate_f));
+        let (ac_s, ac_predicate) = rayon::join(ac_s_f, ac_predicate_f);
         let (mut ac_s, ac_predicate) = (ac_s?, ac_predicate?);
 
         let groups = ac_s.groups();
