@@ -463,148 +463,150 @@ where
 
     /// Read the file and create the DataFrame.
     fn finish(mut self) -> Result<DataFrame> {
-        let rechunk = self.rechunk;
-        // we cannot append categorical under local string cache, so we cast them later.
-        #[allow(unused_mut)]
-        let mut to_cast_local = vec![];
+        todo!()
 
-        let mut df = if let Some(schema) = self.schema_overwrite {
-            // This branch we check if there are dtypes we cannot parse.
-            // We only support a few dtypes in the parser and later cast to the required dtype
-            let mut to_cast = Vec::with_capacity(schema.len());
+        // let rechunk = self.rechunk;
+        // // we cannot append categorical under local string cache, so we cast them later.
+        // #[allow(unused_mut)]
+        // let mut to_cast_local = vec![];
 
-            #[allow(clippy::unnecessary_filter_map)]
-            let fields: Vec<_> = schema
-                .iter_fields()
-                .filter_map(|fld| {
-                    use DataType::*;
-                    match fld.data_type() {
-                        // For categorical we first read as utf8 and later cast to categorical
-                        #[cfg(feature = "dtype-categorical")]
-                        Categorical(_) => {
-                            to_cast_local.push(fld.clone());
-                            Some(Field::new(fld.name(), DataType::Utf8))
-                        }
-                        Date | Datetime(_, _) => {
-                            to_cast.push(fld);
-                            // let inference decide the column type
-                            None
-                        }
-                        Time => {
-                            to_cast.push(fld);
-                            // let inference decide the column type
-                            None
-                        }
-                        Int8 | Int16 | UInt8 | UInt16 | Boolean => {
-                            // We have not compiled these buffers, so we cast them later.
-                            to_cast.push(fld);
-                            // let inference decide the column type
-                            None
-                        }
-                        _ => Some(fld),
-                    }
-                })
-                .collect();
-            let schema = Schema::from(fields);
+        // let mut df = if let Some(schema) = self.schema_overwrite {
+        //     // This branch we check if there are dtypes we cannot parse.
+        //     // We only support a few dtypes in the parser and later cast to the required dtype
+        //     let mut to_cast = Vec::with_capacity(schema.len());
 
-            // we cannot overwrite self, because the lifetime is already instantiated with `a, and
-            // the lifetime that accompanies this scope is shorter.
-            // So we just build_csv_reader from here
-            let reader_bytes = get_reader_bytes(&mut self.reader)?;
-            let mut csv_reader = CoreReader::new(
-                reader_bytes,
-                self.n_rows,
-                self.skip_rows,
-                self.projection,
-                self.max_records,
-                self.delimiter,
-                self.has_header,
-                self.ignore_parser_errors,
-                self.schema,
-                self.columns,
-                self.encoding,
-                self.n_threads,
-                Some(&schema),
-                self.dtype_overwrite,
-                self.sample_size,
-                self.chunk_size,
-                self.low_memory,
-                self.comment_char,
-                self.quote_char,
-                self.null_values,
-                self.predicate,
-                self.aggregate,
-                &to_cast,
-                self.skip_rows_after_header,
-                self.row_count,
-                self.parse_dates,
-            )?;
-            csv_reader.as_df()?
-        } else {
-            let reader_bytes = get_reader_bytes(&mut self.reader)?;
-            let mut csv_reader = CoreReader::new(
-                reader_bytes,
-                self.n_rows,
-                self.skip_rows,
-                self.projection,
-                self.max_records,
-                self.delimiter,
-                self.has_header,
-                self.ignore_parser_errors,
-                self.schema,
-                self.columns,
-                self.encoding,
-                self.n_threads,
-                self.schema,
-                self.dtype_overwrite,
-                self.sample_size,
-                self.chunk_size,
-                self.low_memory,
-                self.comment_char,
-                self.quote_char,
-                self.null_values,
-                self.predicate,
-                self.aggregate,
-                &[],
-                self.skip_rows_after_header,
-                self.row_count,
-                self.parse_dates,
-            )?;
-            csv_reader.as_df()?
-        };
+        //     #[allow(clippy::unnecessary_filter_map)]
+        //     let fields: Vec<_> = schema
+        //         .iter_fields()
+        //         .filter_map(|fld| {
+        //             use DataType::*;
+        //             match fld.data_type() {
+        //                 // For categorical we first read as utf8 and later cast to categorical
+        //                 #[cfg(feature = "dtype-categorical")]
+        //                 Categorical(_) => {
+        //                     to_cast_local.push(fld.clone());
+        //                     Some(Field::new(fld.name(), DataType::Utf8))
+        //                 }
+        //                 Date | Datetime(_, _) => {
+        //                     to_cast.push(fld);
+        //                     // let inference decide the column type
+        //                     None
+        //                 }
+        //                 Time => {
+        //                     to_cast.push(fld);
+        //                     // let inference decide the column type
+        //                     None
+        //                 }
+        //                 Int8 | Int16 | UInt8 | UInt16 | Boolean => {
+        //                     // We have not compiled these buffers, so we cast them later.
+        //                     to_cast.push(fld);
+        //                     // let inference decide the column type
+        //                     None
+        //                 }
+        //                 _ => Some(fld),
+        //             }
+        //         })
+        //         .collect();
+        //     let schema = Schema::from(fields);
 
-        // Important that this rechunk is never done in parallel.
-        // As that leads to great memory overhead.
-        if rechunk && df.n_chunks()? > 1 {
-            if self.low_memory {
-                df.as_single_chunk();
-            } else {
-                df.as_single_chunk_par();
-            }
-        }
+        //     // we cannot overwrite self, because the lifetime is already instantiated with `a, and
+        //     // the lifetime that accompanies this scope is shorter.
+        //     // So we just build_csv_reader from here
+        //     let reader_bytes = get_reader_bytes(&mut self.reader)?;
+        //     let mut csv_reader = CoreReader::new(
+        //         reader_bytes,
+        //         self.n_rows,
+        //         self.skip_rows,
+        //         self.projection,
+        //         self.max_records,
+        //         self.delimiter,
+        //         self.has_header,
+        //         self.ignore_parser_errors,
+        //         self.schema,
+        //         self.columns,
+        //         self.encoding,
+        //         self.n_threads,
+        //         Some(&schema),
+        //         self.dtype_overwrite,
+        //         self.sample_size,
+        //         self.chunk_size,
+        //         self.low_memory,
+        //         self.comment_char,
+        //         self.quote_char,
+        //         self.null_values,
+        //         self.predicate,
+        //         self.aggregate,
+        //         &to_cast,
+        //         self.skip_rows_after_header,
+        //         self.row_count,
+        //         self.parse_dates,
+        //     )?;
+        //     csv_reader.as_df()?
+        // } else {
+        //     let reader_bytes = get_reader_bytes(&mut self.reader)?;
+        //     let mut csv_reader = CoreReader::new(
+        //         reader_bytes,
+        //         self.n_rows,
+        //         self.skip_rows,
+        //         self.projection,
+        //         self.max_records,
+        //         self.delimiter,
+        //         self.has_header,
+        //         self.ignore_parser_errors,
+        //         self.schema,
+        //         self.columns,
+        //         self.encoding,
+        //         self.n_threads,
+        //         self.schema,
+        //         self.dtype_overwrite,
+        //         self.sample_size,
+        //         self.chunk_size,
+        //         self.low_memory,
+        //         self.comment_char,
+        //         self.quote_char,
+        //         self.null_values,
+        //         self.predicate,
+        //         self.aggregate,
+        //         &[],
+        //         self.skip_rows_after_header,
+        //         self.row_count,
+        //         self.parse_dates,
+        //     )?;
+        //     csv_reader.as_df()?
+        // };
 
-        #[cfg(feature = "temporal")]
-        // only needed until we also can parse time columns in place
-        if self.parse_dates {
-            // determine the schema that's given by the user. That should not be changed
-            let fixed_schema = match (self.schema_overwrite, self.dtype_overwrite) {
-                (Some(schema), _) => Cow::Borrowed(schema),
-                (None, Some(dtypes)) => {
-                    let fields: Vec<_> = dtypes
-                        .iter()
-                        .zip(df.get_column_names())
-                        .map(|(dtype, name)| Field::new(name, dtype.clone()))
-                        .collect();
+        // // Important that this rechunk is never done in parallel.
+        // // As that leads to great memory overhead.
+        // if rechunk && df.n_chunks()? > 1 {
+        //     if self.low_memory {
+        //         df.as_single_chunk();
+        //     } else {
+        //         df.as_single_chunk_par();
+        //     }
+        // }
 
-                    Cow::Owned(Schema::from(fields))
-                }
-                _ => Cow::Owned(Schema::default()),
-            };
-            df = parse_dates(df, &*fixed_schema)
-        }
+        // #[cfg(feature = "temporal")]
+        // // only needed until we also can parse time columns in place
+        // if self.parse_dates {
+        //     // determine the schema that's given by the user. That should not be changed
+        //     let fixed_schema = match (self.schema_overwrite, self.dtype_overwrite) {
+        //         (Some(schema), _) => Cow::Borrowed(schema),
+        //         (None, Some(dtypes)) => {
+        //             let fields: Vec<_> = dtypes
+        //                 .iter()
+        //                 .zip(df.get_column_names())
+        //                 .map(|(dtype, name)| Field::new(name, dtype.clone()))
+        //                 .collect();
 
-        cast_columns(&mut df, &to_cast_local, true)?;
-        Ok(df)
+        //             Cow::Owned(Schema::from(fields))
+        //         }
+        //         _ => Cow::Owned(Schema::default()),
+        //     };
+        //     df = parse_dates(df, &*fixed_schema)
+        // }
+
+        // cast_columns(&mut df, &to_cast_local, true)?;
+        // Ok(df)
     }
 }
 
