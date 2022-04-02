@@ -242,7 +242,7 @@ where
     let right_asof = right_asof.rechunk();
     let right_asof = right_asof.cont_slice().unwrap();
 
-    let n_threads = 8 as usize;
+    let n_threads = polars::utils::get_n_threads();
     let splitted_left = split_ca(by_left, n_threads).unwrap();
     let splitted_right = split_ca(by_right, n_threads).unwrap();
 
@@ -353,7 +353,7 @@ where
     let right_asof = right_asof.rechunk();
     let right_asof = right_asof.cont_slice().unwrap();
 
-    let n_threads = 8 as usize;
+    let n_threads = polars::utils::get_n_threads();
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 

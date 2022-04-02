@@ -32,7 +32,7 @@ use crate::prelude::sort::prepare_argsort;
 use crate::vector_hasher::boost_hash_combine;
 #[cfg(feature = "row_hash")]
 use crate::vector_hasher::df_rows_to_hashes_threaded;
-#[cfg(feature = "multi-threaded")]
+#[cfg(not(target_family  = "wasm"))]
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::hash::{BuildHasher, Hash, Hasher};
@@ -1374,7 +1374,7 @@ impl DataFrame {
     /// Does a filter but splits thread chunks vertically instead of horizontally
     /// This yields a DataFrame with `n_chunks == n_threads`.
     fn filter_vertical(&self, mask: &BooleanChunked) -> Result<Self> {
-        let n_threads = 8 as usize;
+        let n_threads = polars::utils::get_n_threads();
 
         let masks = split_ca(mask, n_threads).unwrap();
         let dfs = split_df(self, n_threads).unwrap();
@@ -1601,7 +1601,7 @@ impl DataFrame {
     }
 
     unsafe fn take_unchecked_vectical(&self, indices: &IdxCa) -> Self {
-        let n_threads = 8 as usize;
+        let n_threads = polars::utils::get_n_threads();
         let idxs = split_ca(indices, n_threads).unwrap();
 
         let dfs: Vec<_> = idxs

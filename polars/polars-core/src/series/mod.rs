@@ -371,7 +371,7 @@ impl Series {
     /// # Safety
     /// This doesn't check any bounds. Null validity is checked.
     pub unsafe fn take_unchecked_threaded(&self, idx: &IdxCa, rechunk: bool) -> Result<Series> {
-        let n_threads = 8 as usize;
+        let n_threads = polars::utils::get_n_threads();
         let idx = split_ca(idx, n_threads)?;
 
         let series: Result<Vec<_>> = idx.par_iter().map(|idx| self.take_unchecked(idx)).collect();
@@ -396,7 +396,7 @@ impl Series {
     ///
     /// Out of bounds access doesn't Error but will return a Null value
     pub fn take_threaded(&self, idx: &IdxCa, rechunk: bool) -> Result<Series> {
-        let n_threads = 8 as usize;
+        let n_threads = polars::utils::get_n_threads();
         let idx = split_ca(idx, n_threads).unwrap();
 
         let series = idx
@@ -426,7 +426,7 @@ impl Series {
         if filter.len() == 1 {
             return self.filter(filter);
         }
-        let n_threads = 8 as usize;
+        let n_threads = polars::utils::get_n_threads();
         let filters = split_ca(filter, n_threads).unwrap();
         let series = split_series(self, n_threads).unwrap();
 

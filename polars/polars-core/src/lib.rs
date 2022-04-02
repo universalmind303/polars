@@ -44,7 +44,7 @@ lazy_static! {
 }
 
 // this is re-exported in utils for polars child crates
-#[cfg(feature = "multi-threaded")]
+#[cfg(not(target_family  = "wasm"))]
 lazy_static! {
     pub static ref POOL: ThreadPool = ThreadPoolBuilder::new()
         .num_threads(

@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 
+
 type Tracker = HashMap<String, HashSet<DataType>>;
 
 #[js_function(1)]
