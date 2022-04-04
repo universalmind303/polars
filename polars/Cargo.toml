@@ -125,7 +125,7 @@ test = [
 
 # don't use this
 private = ["polars-lazy/private", "polars-core/private", "polars-time/private"]
-
+wasm = ["polars-core/wasm"]
 # all opt-in datatypes
 dtype-full = [
   "dtype-date",

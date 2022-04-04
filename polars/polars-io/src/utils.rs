@@ -81,33 +81,7 @@ pub(crate) fn update_row_counts(dfs: &mut [(DataFrame, u32)]) {
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
-pub(crate) fn get_n_threads() -> usize {
-    POOL.current_num_threads()
-}
 
-#[cfg(not(target_family = "wasm"))]
-pub(crate) fn run_in_pool<OP, R>(op: OP) -> R
-where
-    OP: FnOnce() -> R + Send,
-    R: Send,
-{
-    POOL.install(op)
-}
-
-#[cfg(target_family = "wasm")]
-pub(crate) fn get_n_threads() -> usize {
-    web_sys::Navigator::hardware_concurrency() as usize
-}
-
-#[cfg(target_family = "wasm")]
-pub(crate) fn run_in_pool<OP, R>(op: OP) -> R
-where
-    OP: FnOnce() -> R + Send,
-    R: Send,
-{
-    op()
-}
 
 #[cfg(test)]
 mod tests {

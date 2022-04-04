@@ -77,7 +77,7 @@ dataframe_arithmetic = []
 product = []
 unique_counts = []
 log = []
-
+wasm = ["web-sys", "js-sys"]
 dynamic_groupby = ["dtype-datetime", "dtype-date"]
 
 # opt-in datatypes for Series
@@ -162,6 +162,7 @@ regex = { version = "1.5", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 thiserror = "^1.0"
+js-sys = { version = "0.3.56", optional = true }
 
 [dependencies.arrow]
 package = "arrow2"
@@ -183,6 +184,14 @@ features = [
   "compute_if_then_else",
   "compute_take",
 ]
+
+[dependencies.web-sys]
+version = "0.3.56"
+features = [
+  'Navigator',
+  "Window"
+]
+optional = true
 
 [dev-dependencies]
 bincode = "1"

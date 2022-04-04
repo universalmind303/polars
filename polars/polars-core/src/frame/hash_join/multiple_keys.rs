@@ -179,7 +179,7 @@ pub(crate) fn inner_join_multiple_keys(
     // we assume that the b DataFrame is the shorter relation.
     // b will be used for the build phase.
 
-    let n_threads = polar_cores::utils::get_n_threads();
+    let n_threads = crate::utils::get_n_threads();
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 
@@ -251,7 +251,7 @@ pub(crate) fn left_join_multiple_keys(
     debug_assert!(!a.iter().any(|s| s.is_logical()));
     debug_assert!(!b.iter().any(|s| s.is_logical()));
 
-    let n_threads = polar_cores::utils::get_n_threads();
+    let n_threads = crate::utils::get_n_threads();
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 
@@ -389,7 +389,7 @@ pub(crate) fn outer_join_multiple_keys(
     let size = a.height() + b.height();
     let mut results = Vec::with_capacity(size);
 
-    let n_threads = polar_cores::utils::get_n_threads();
+    let n_threads = crate::utils::get_n_threads();
     let dfs_a = split_df(a, n_threads).unwrap();
     let dfs_b = split_df(b, n_threads).unwrap();
 

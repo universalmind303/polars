@@ -891,6 +891,39 @@ pub(crate) unsafe fn copy_from_slice_unchecked<T>(src: &[T], dst: &mut [T]) {
     std::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), dst.len());
 }
 
+
+
+#[cfg(not(target_family = "wasm"))]
+pub fn get_n_threads() -> usize {
+    POOL.current_num_threads()
+}
+
+#[cfg(target_family = "wasm")]
+pub fn get_n_threads() -> usize {
+    let window = web_sys::window().expect("to be called in browser");
+    let nav = window.navigator();
+    nav.hardware_concurrency() as usize
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn run_in_pool<OP, R>(op: OP) -> R
+where
+    OP: FnOnce() -> R + Send,
+    R: Send,
+{
+    POOL.install(op)
+}
+
+// this just runs in the global pool & is wrapped for interop purposes
+#[cfg(target_family = "wasm")]
+pub(crate) fn run_in_pool<OP, R>(op: OP) -> R
+where
+    OP: FnOnce() -> R + Send,
+    R: Send,
+{
+    op()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

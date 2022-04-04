@@ -1,6 +1,6 @@
 use crate::prelude::any_value::arr_to_any_value;
 use crate::prelude::*;
-use crate::utils::NoNull;
+use crate::utils::{NoNull, get_n_threads};
 
 macro_rules! from_iterator {
     ($native:ty, $variant:ident) => {

@@ -10,7 +10,7 @@ use rayon::prelude::*;
 
 use crate::chunked_array::ops::unique::is_unique_helper;
 use crate::prelude::*;
-use crate::utils::{accumulate_dataframes_horizontal, get_supertype, split_ca, split_df, NoNull};
+use crate::utils::{accumulate_dataframes_horizontal, get_supertype, split_ca, split_df, NoNull, get_n_threads};
 
 #[cfg(feature = "dataframe_arithmetic")]
 mod arithmetic;
@@ -1374,7 +1374,7 @@ impl DataFrame {
     /// Does a filter but splits thread chunks vertically instead of horizontally
     /// This yields a DataFrame with `n_chunks == n_threads`.
     fn filter_vertical(&self, mask: &BooleanChunked) -> Result<Self> {
-        let n_threads = polar_cores::utils::get_n_threads();
+        let n_threads = crate::utils::get_n_threads();
 
         let masks = split_ca(mask, n_threads).unwrap();
         let dfs = split_df(self, n_threads).unwrap();
@@ -1601,7 +1601,7 @@ impl DataFrame {
     }
 
     unsafe fn take_unchecked_vectical(&self, indices: &IdxCa) -> Self {
-        let n_threads = polar_cores::utils::get_n_threads();
+        let n_threads = crate::utils::get_n_threads();
         let idxs = split_ca(indices, n_threads).unwrap();
 
         let dfs: Vec<_> = idxs

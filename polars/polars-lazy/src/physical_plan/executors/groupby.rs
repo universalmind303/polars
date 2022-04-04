@@ -288,7 +288,7 @@ impl Executor for PartitionGroupByExec {
         }
 
         // Run the partitioned aggregations
-        let n_threads = polar_cores::utils::get_n_threads();
+        let n_threads = polars_core::utils::get_n_threads();
         let dfs = run_partitions(&original_df, self, state, n_threads, self.maintain_order)?;
 
         // MERGE phase
