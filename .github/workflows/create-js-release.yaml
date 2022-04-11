@@ -23,8 +23,8 @@ jobs:
             target: x86_64-unknown-linux-gnu
             architecture: x64
             docker: |
-              docker pull ghcr.io/napi-rs/napi-rs/nodejs-rust@sha256:8261a566b9fb5d07fe994bfa01deb2477e8cfbcb13f9b7685fd1b863c2aceb5c
-              docker tag ghcr.io/napi-rs/napi-rs/nodejs-rust@sha256:8261a566b9fb5d07fe994bfa01deb2477e8cfbcb13f9b7685fd1b863c2aceb5c builder
+              docker pull ghcr.io/napi-rs/napi-rs/nodejs-rust@sha256:e510d7fdb259bd9b7ce05aa961223dd6379c1a944f85c271b76561b7ab7565b2
+              docker tag ghcr.io/napi-rs/napi-rs/nodejs-rust@sha256:e510d7fdb259bd9b7ce05aa961223dd6379c1a944f85c271b76561b7ab7565b2 builder
             build: |
               docker run --rm -v ~/.cargo/git:/root/.cargo/git -v ~/.cargo/registry:/root/.cargo/registry -v "$GITHUB_WORKSPACE:/build" -w /build/nodejs-polars builder yarn build:debug && strip *.node
 
