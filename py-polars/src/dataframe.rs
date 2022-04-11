@@ -78,6 +78,10 @@ impl PyDataFrame {
         Ok(PyDataFrame::new(df))
     }
 
+    pub fn estimated_size(&self) -> usize {
+        self.df.estimated_size()
+    }
+
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     pub fn read_csv(
