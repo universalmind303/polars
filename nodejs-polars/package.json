@@ -44,7 +44,7 @@
     "artifacts": "napi artifacts",
     "bench": "node -r @swc-node/register benchmark/bench.ts",
     "build": "napi build --platform --release polars",
-    "build:debug": "napi build --platform",
+    "build:debug": "napi build --platform polars",
     "build:ts": " rm -rf bin; tsc -p tsconfig.build.json; mv bin/polars/* bin",
     "format:rs": "cargo fmt",
     "format:source": "prettier --config ./package.json --write './**/*.{js,ts}'",
