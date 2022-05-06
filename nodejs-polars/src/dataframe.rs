@@ -149,6 +149,7 @@ pub fn read_csv(
 pub struct ReadJsonOptions {
     pub infer_schema_length: Option<u32>,
     pub batch_size: Option<u32>,
+    // pub schema: Option<Schema>,
     pub format: Option<String>,
 }
 
@@ -168,12 +169,14 @@ pub fn read_json_lines(
     let df = match path_or_buffer {
         Either::A(path) => JsonLineReader::from_path(path)
             .expect("unable to read file")
+            .with_chunk_size(batch_size)
             .infer_schema_len(Some(infer_schema_length))
             .finish()
             .map_err(JsPolarsErr::from)?,
         Either::B(buf) => {
             let cursor = Cursor::new(buf.as_ref());
             JsonLineReader::new(cursor)
+                .with_chunk_size(batch_size)
                 .infer_schema_len(Some(infer_schema_length))
                 .finish()
                 .map_err(JsPolarsErr::from)?
@@ -602,8 +605,8 @@ impl JsDataFrame {
 
     /// Get datatypes
     #[napi]
-    pub fn dtypes(&self) -> Vec<JsDataType> {
-        self.df.iter().map(|s| s.dtype().into()).collect()
+    pub fn dtypes(&self) -> Vec<Wrap<DataType>> {
+        self.df.iter().map(|s| Wrap(s.dtype().clone())).collect()
     }
     #[napi]
     pub fn n_chunks(&self) -> napi::Result<u32> {
@@ -1040,10 +1043,14 @@ impl JsDataFrame {
         shuffle: bool,
         seed: Option<i64>,
     ) -> napi::Result<JsDataFrame> {
-        
         let df = self
             .df
-            .sample_n(n as usize, with_replacement, shuffle, seed.map(|s| s as u64))
+            .sample_n(
+                n as usize,
+                with_replacement,
+                shuffle,
+                seed.map(|s| s as u64),
+            )
             .map_err(JsPolarsErr::from)?;
         Ok(df.into())
     }
@@ -1056,7 +1063,6 @@ impl JsDataFrame {
         shuffle: bool,
         seed: Option<i64>,
     ) -> napi::Result<JsDataFrame> {
-        
         let df = self
             .df
             .sample_frac(frac, with_replacement, shuffle, seed.map(|s| s as u64))

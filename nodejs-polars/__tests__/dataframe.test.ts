@@ -1464,7 +1464,7 @@ describe("create", () => {
       string_nulls: pl.Utf8,
       categorical: pl.Categorical,
       categorical_nulls: pl.Categorical,
-      list: pl.List,
+      list: pl.List(pl.Float64),
       float_64: pl.Float64,
       float_64_nulls: pl.Float64,
       uint_64: pl.UInt64,

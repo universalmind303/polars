@@ -10,30 +10,30 @@ export const jsTypeToPolarsType = (value: unknown): DataType => {
     return DataType.Float64;
   }
   if (Array.isArray(value)) {
-    return jsTypeToPolarsType(firstNonNull(value));
+    return DataType.List(jsTypeToPolarsType(firstNonNull(value)));
   }
   if(isTypedArray(value)) {
     switch (value.constructor.name) {
     case Int8Array.name:
-      return DataType.Int8;
+      return DataType.List(DataType.Int8);
     case Int16Array.name:
-      return DataType.Int16;
+      return DataType.List(DataType.Int16);
     case Int32Array.name:
-      return DataType.Int32;
+      return DataType.List(DataType.Int32);
     case BigInt64Array.name:
-      return DataType.Int64;
+      return DataType.List(DataType.Int64);
     case Uint8Array.name:
-      return DataType.UInt8;
+      return DataType.List(DataType.UInt8);
     case Uint16Array.name:
-      return DataType.UInt16;
+      return DataType.List(DataType.UInt16);
     case Uint32Array.name:
-      return DataType.UInt32;
+      return DataType.List(DataType.UInt32);
     case BigUint64Array.name:
-      return DataType.UInt64;
+      return DataType.List(DataType.UInt64);
     case Float32Array.name:
-      return DataType.Float32;
+      return DataType.List(DataType.Float32);
     case Float64Array.name:
-      return DataType.Float64;
+      return DataType.List(DataType.Float64);
     default:
       throw new Error(`unknown  typed array type: ${value.constructor.name}`);
     }
@@ -43,8 +43,12 @@ export const jsTypeToPolarsType = (value: unknown): DataType => {
     return DataType.Datetime;
   }
   if(typeof value === "object" && (value as any).constructor === Object) {
+    const dtypes = {};
+    for (let key in value) {
+      dtypes[key] = jsTypeToPolarsType(value[key]);
+    }
 
-    return DataType.Struct;
+    return DataType.Struct(dtypes);
   }
 
   switch (typeof value) {
@@ -130,15 +134,14 @@ export function arrayToJsSeries(name: string = "", values: any[] = [], dtype?: a
   const firstValue = firstNonNull(values);
   if(Array.isArray(firstValue) || isTypedArray(firstValue)) {
     const listDtype = jsTypeToPolarsType(firstValue);
+    const constructor = polarsTypeToConstructor(listDtype);
 
-    const constructor = polarsTypeToConstructor(DataType.List);
-
-    return constructor(name, values, strict, listDtype);
+    return constructor(name, values, strict, (listDtype as any).List);
   }
 
   dtype = dtype ?? jsTypeToPolarsType(firstValue);
   let series: any;
-  if(dtype === DataType.Struct) {
+  if(typeof dtype === "object" && (dtype as any).constructor === Object) {
     const df = pli.fromRows(values, null, 1);
 
     return df.toStruct(name);
@@ -187,7 +190,7 @@ export function arrayToJsDataFrame(data: any[], options?): any {
   }
   else if(data[0].constructor.name === "Object") {
 
-    const df = pli.fromRows( data, options);
+    const df = pli.fromRows(data, options);
 
     if(columns) {
       df.columns = columns;

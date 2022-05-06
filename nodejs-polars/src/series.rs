@@ -234,8 +234,8 @@ impl JsSeries {
     // GETTERS
     //
     #[napi(getter)]
-    pub fn dtype(&self) -> JsDataType {
-        self.series.dtype().into()
+    pub fn dtype(&self) -> Wrap<DataType> {
+        Wrap(self.series.dtype().clone())
     }
 
     #[napi(getter)]
@@ -244,8 +244,8 @@ impl JsSeries {
     }
 
     #[napi(getter)]
-    pub fn inner_dtype(&self) -> Option<JsDataType> {
-        self.series.dtype().inner_dtype().map(|dt| dt.into())
+    pub fn inner_dtype(&self) -> Option<Wrap<DataType>> {
+        self.series.dtype().inner_dtype().map(|dt| Wrap(dt.clone()))
     }
     #[napi(getter)]
     pub fn name(&self) -> String {

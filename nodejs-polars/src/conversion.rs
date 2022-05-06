@@ -598,6 +598,42 @@ impl FromNapiValue for Wrap<DataType> {
                 let n = u32::from_napi_value(env, napi_val)?;
                 num_to_polarstype(n)
             }
+            ValueType::Object => {
+                if let Ok(o) = HashMap::<String, Wrap<DataType>>::from_napi_value(env, napi_val) {
+                    if let Some(lst) = o.get("List") {
+                        DataType::List(Box::new(lst.0.clone()))
+                    } else {
+                        return Err(Error::new(
+                            Status::InvalidArg,
+                            "not a valid conversion to 'DataType::List'".to_owned(),
+                        ));
+                    }
+                } else if let Ok(o) =
+                    HashMap::<String, HashMap<String, Wrap<DataType>>>::from_napi_value(
+                        env, napi_val,
+                    )
+                {
+                    if let Some(obj) = o.get("Struct") {
+                        let dtype = DataType::Struct(
+                            obj.into_iter()
+                                .map(|(name, dtype)| Field::new(name, dtype.0.clone()))
+                                .collect(),
+                        );
+                        println!("{dtype}");
+                        dtype
+                    } else {
+                        return Err(Error::new(
+                            Status::InvalidArg,
+                            "not a valid conversion to 'DataType::Struct'".to_owned(),
+                        ));
+                    }
+                } else {
+                    return Err(Error::new(
+                        Status::InvalidArg,
+                        "not a valid conversion to 'DataType'".to_owned(),
+                    ));
+                }
+            }
             _ => {
                 return Err(Error::new(
                     Status::InvalidArg,
@@ -606,6 +642,50 @@ impl FromNapiValue for Wrap<DataType> {
             }
         };
         Ok(Wrap(dtype))
+    }
+}
+
+impl ToNapiValue for Wrap<DataType> {
+    unsafe fn to_napi_value(env: sys::napi_env, val: Self) -> napi::Result<sys::napi_value> {
+        let dtype = val.0;
+        match dtype {
+            DataType::Int8 => String::to_napi_value(env, "Int8".to_owned()),
+            DataType::Int16 => String::to_napi_value(env, "Int16".to_owned()),
+            DataType::Int32 => String::to_napi_value(env, "Int32".to_owned()),
+            DataType::Int64 => String::to_napi_value(env, "Int64".to_owned()),
+            DataType::UInt8 => String::to_napi_value(env, "UInt8".to_owned()),
+            DataType::UInt16 => String::to_napi_value(env, "UInt16".to_owned()),
+            DataType::UInt32 => String::to_napi_value(env, "UInt32".to_owned()),
+            DataType::UInt64 => String::to_napi_value(env, "UInt64".to_owned()),
+            DataType::Float32 => String::to_napi_value(env, "Float32".to_owned()),
+            DataType::Float64 => String::to_napi_value(env, "Float64".to_owned()),
+            DataType::Boolean => String::to_napi_value(env, "Bool".to_owned()),
+            DataType::Utf8 => String::to_napi_value(env, "Utf8".to_owned()),
+            DataType::Date => String::to_napi_value(env, "Date".to_owned()),
+            DataType::Datetime(_,_) => String::to_napi_value(env, "Datetime".to_owned()),
+            DataType::Time => String::to_napi_value(env, "Time".to_owned()),
+            DataType::Object(_) => String::to_napi_value(env, "Object".to_owned()),
+            DataType::Categorical(_) => String::to_napi_value(env, "Categorical".to_owned()),
+            DataType::Duration(_) => String::to_napi_value(env, "Duration".to_owned()),
+            DataType::Null => String::to_napi_value(env, "Null".to_owned()),
+            DataType::Unknown => String::to_napi_value(env, "Unknown".to_owned()),
+            DataType::List(inner) => {
+                let mut hmap = HashMap::new();
+                let inner: DataType = (*inner).clone();
+                hmap.insert("List".to_owned(), Wrap(inner));
+
+                HashMap::<String, Wrap<DataType>>::to_napi_value(env, hmap)
+            }
+            DataType::Struct(flds) => {
+                let mut hmap = HashMap::new();
+                let s = flds
+                .iter()
+                .map(|fld| (fld.name().clone(), Wrap(fld.data_type().clone())))
+                .collect();
+                hmap.insert("List".to_owned(), s);
+                HashMap::<String, HashMap<String, Wrap<DataType>>>::to_napi_value(env, hmap)
+            },
+        }
     }
 }
 

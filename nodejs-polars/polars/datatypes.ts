@@ -1,56 +1,40 @@
 import {jsTypeToPolarsType} from "./internals/construction";
 import pli from "./internals/polars_internal";
 
-export type DtypeToPrimitive<T> = T extends DataType.Bool ? boolean :
- T extends DataType.Utf8 ? string :
- T extends DataType.Categorical ? string :
- T extends DataType.Datetime ? number | Date :
- T extends DataType.Date ? Date :
- T extends DataType.UInt64 ? bigint : number
-
-export type PrimitiveToDtype<T> = T extends boolean ? DataType.Bool :
- T extends string ? DataType.Utf8 :
- T extends Date ? DataType.Datetime :
- T extends number ? DataType.Float64 :
- T extends bigint ? DataType.Int64 :
- T extends ArrayLike<any> ? DataType.List :
- DataType.Object
 
 export type TypedArray = Int8Array | Int16Array | Int32Array | BigInt64Array | Uint8Array | Uint16Array | Uint32Array | BigInt64Array | Float32Array | Float64Array;
 
-export type DtypeToTypedArray<T> = T extends DataType.Int8 ? Int8Array :
-T extends DataType.Int16 ? Int16Array :
-T extends DataType.Int32 ? Int32Array :
-T extends DataType.Int64 ? BigInt64Array :
-T extends DataType.UInt8 ? Uint8Array :
-T extends DataType.UInt16 ? Uint16Array :
-T extends DataType.UInt32 ? Uint32Array :
-T extends DataType.UInt64 ? BigInt64Array :
-T extends DataType.Float32 ? Float32Array :
-T extends DataType.Float64 ? Float64Array :
-never
 
 export type Optional<T> = T | undefined | null;
+
+export namespace DataType {
+  export type List = {List: DataType};
+  export function List(inner: DataType) {
+    return {List: inner} as any as DataType;
+  }
+  export type Struct = {Struct: {[key: string]: DataType}};
+  export function Struct(dtypes) {
+    return {Struct: dtypes} as any as DataType;
+  }
+}
 export enum DataType {
-  Int8,
-  Int16,
-  Int32,
-  Int64,
-  UInt8,
-  UInt16,
-  UInt32,
-  UInt64,
-  Float32,
-  Float64,
-  Bool,
-  Utf8,
-  List,
-  Date,
-  Datetime,
-  Time,
-  Object,
-  Categorical,
-  Struct
+  Int8 = "Int8",
+  Int16 = "Int16",
+  Int32 = "Int32",
+  Int64 = "Int64",
+  UInt8 = "UInt8",
+  UInt16 = "UInt16",
+  UInt32 = "UInt32",
+  UInt64 = "UInt64",
+  Float32 = "Float32",
+  Float64 = "Float64",
+  Bool = "Bool",
+  Utf8 = "Utf8",
+  Date = "Date",
+  Datetime = "Datetime",
+  Time = "Time",
+  Object = "Object",
+  Categorical = "Categorical",
 }
 
 
@@ -70,7 +54,7 @@ export type JoinOptions = {
 };
 
 
-export const DTYPE_TO_FFINAME: Record<DataType, string> = {
+export const DTYPE_TO_FFINAME: Record<string, string> = {
   [DataType.Int8]: "I8",
   [DataType.Int16]: "I16",
   [DataType.Int32]: "I32",
@@ -83,13 +67,13 @@ export const DTYPE_TO_FFINAME: Record<DataType, string> = {
   [DataType.Float64]: "F64",
   [DataType.Bool]: "Bool",
   [DataType.Utf8]: "Str",
-  [DataType.List]: "List",
   [DataType.Date]: "Date",
   [DataType.Datetime]: "Datetime",
   [DataType.Time]: "Time",
   [DataType.Object]: "Object",
   [DataType.Categorical]: "Categorical",
-  [DataType.Struct]: "Struct",
+  List: "List",
+  Struct: "Struct",
 };
 
 const POLARS_TYPE_TO_CONSTRUCTOR: Record<string, any> = {
@@ -143,10 +127,13 @@ const POLARS_TYPE_TO_CONSTRUCTOR: Record<string, any> = {
   },
 };
 
-export const polarsTypeToConstructor = (dtype: DataType): CallableFunction => {
-  const constructor = POLARS_TYPE_TO_CONSTRUCTOR[DataType[dtype]];
+export const polarsTypeToConstructor = (dtype: any): CallableFunction => {
+  if((typeof dtype === "object" && (dtype as any).constructor === Object) || typeof dtype === "function") {
+    return POLARS_TYPE_TO_CONSTRUCTOR.List;
+  }
+  const constructor = POLARS_TYPE_TO_CONSTRUCTOR[dtype];
   if (!constructor) {
-    throw new Error(`Cannot construct Series for type ${DataType[dtype]}.`);
+    throw new Error(`Cannot construct Series for type ${dtype}.`);
   }
 
 
