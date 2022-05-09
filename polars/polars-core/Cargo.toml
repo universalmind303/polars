@@ -192,6 +192,9 @@ features = [
   "compute_if_then_else",
 ]
 
+[target.'cfg(target_family = "wasm")'.dependencies.getrandom]
+features = ["js"]
+
 [dev-dependencies]
 bincode = "1"
 

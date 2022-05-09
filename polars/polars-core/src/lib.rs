@@ -43,6 +43,7 @@ pub(crate) static PROCESS_ID: Lazy<u128> = Lazy::new(|| {
 });
 
 // this is re-exported in utils for polars child crates
+#[cfg(not(target_family="wasm"))]
 pub static POOL: Lazy<ThreadPool> = Lazy::new(|| {
     ThreadPoolBuilder::new()
         .num_threads(
@@ -56,6 +57,11 @@ pub static POOL: Lazy<ThreadPool> = Lazy::new(|| {
         )
         .build()
         .expect("could not spawn threads")
+});
+
+#[cfg(target_family="wasm")]
+pub static POOL: Lazy<polars_utils::wasm::Pool> = Lazy::new(||{
+    polars_utils::wasm::Pool
 });
 
 // utility for the tests to ensure a single thread can execute
