@@ -79,8 +79,7 @@ impl LogicalPlanBuilder {
                 output_schema: None,
                 with_columns: None,
                 predicate_pushdown,
-                projection_pushdown,
-                predicate: None
+                projection_pushdown
             },
         }
         .into())

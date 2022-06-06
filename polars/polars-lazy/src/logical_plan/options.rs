@@ -164,7 +164,7 @@ pub struct PythonOptions {
     pub(crate) with_columns: Option<Arc<Vec<String>>>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AnonymousScanOptions {
     pub schema: SchemaRef,
@@ -174,6 +174,5 @@ pub struct AnonymousScanOptions {
     pub with_columns: Option<Arc<Vec<String>>>,
     pub predicate_pushdown: bool,
     pub projection_pushdown: bool,
-    pub predicate: Option<Arc<dyn PhysicalExpr>>,
     pub(crate) fmt_str: &'static str,
 }

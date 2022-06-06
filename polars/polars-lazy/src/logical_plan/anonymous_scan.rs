@@ -1,9 +1,9 @@
-use crate::prelude::AnonymousScanOptions;
+use crate::prelude::{AnonymousScanOptions, PhysicalExpr};
 use polars_core::prelude::*;
 use std::fmt::{Debug, Formatter};
 
 pub trait AnonymousScan: Send + Sync {
-    fn finish(&self, scan_opts: AnonymousScanOptions) -> Result<DataFrame>;
+    fn finish(&self, scan_opts: AnonymousScanOptions, predicate: Option<Arc<dyn PhysicalExpr>>) -> Result<DataFrame>;
     fn schema(&self, _infer_schema_length: Option<usize>) -> Result<Schema> {
         Err(PolarsError::ComputeError(
             "Must supply either a schema or a schema function".into(),
@@ -13,12 +13,13 @@ pub trait AnonymousScan: Send + Sync {
 
 impl<F> AnonymousScan for F
 where
-    F: Fn(AnonymousScanOptions) -> Result<DataFrame> + Send + Sync,
+    F: Fn(AnonymousScanOptions, Option<Arc<dyn PhysicalExpr>>) -> Result<DataFrame> + Send + Sync,
 {
-    fn finish(&self, scan_opts: AnonymousScanOptions) -> Result<DataFrame> {
-        self(scan_opts)
+    fn finish(&self, scan_opts: AnonymousScanOptions, predicate: Option<Arc<dyn PhysicalExpr>>) -> Result<DataFrame> {
+        self(scan_opts, predicate)
     }
 }
+
 
 impl Debug for dyn AnonymousScan {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

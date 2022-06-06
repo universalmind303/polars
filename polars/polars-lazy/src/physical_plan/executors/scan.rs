@@ -296,7 +296,7 @@ pub(crate) struct AnonymousScanExec {
 
 impl Executor for AnonymousScanExec {
     fn execute(&mut self, state: &ExecutionState) -> Result<DataFrame> {
-        let mut df = self.function.finish(self.options.clone())?;
+        let mut df = self.function.finish(self.options.clone(), self.predicate.clone())?;
         if let Some(predicate) = &self.predicate {
             if !self.options.predicate_pushdown {
                 let s = predicate.evaluate(&df, state)?;

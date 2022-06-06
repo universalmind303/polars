@@ -235,9 +235,6 @@ impl DefaultPlanner {
                 let predicate = predicate
                     .map(|pred| self.create_physical_expr(pred, Context::Default, expr_arena))
                     .map_or(Ok(None), |v| v.map(Some))?;
-                if options.predicate_pushdown {
-                    options.predicate = predicate;
-                }
                 
                 Ok(Box::new(executors::AnonymousScanExec {
                     function,
