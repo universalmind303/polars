@@ -298,11 +298,13 @@ impl Executor for AnonymousScanExec {
     fn execute(&mut self, state: &ExecutionState) -> Result<DataFrame> {
         let mut df = self.function.finish(self.options.clone())?;
         if let Some(predicate) = &self.predicate {
-            let s = predicate.evaluate(&df, state)?;
-            let mask = s.bool().map_err(|_| {
-                PolarsError::ComputeError("filter predicate was not of type boolean".into())
-            })?;
-            df = df.filter(mask)?;
+            if !self.options.predicate_pushdown {
+                let s = predicate.evaluate(&df, state)?;
+                let mask = s.bool().map_err(|_| {
+                    PolarsError::ComputeError("filter predicate was not of type boolean".into())
+                })?;
+                df = df.filter(mask)?;
+            }
         }
         Ok(df)
     }

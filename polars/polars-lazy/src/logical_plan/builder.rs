@@ -59,6 +59,7 @@ impl LogicalPlanBuilder {
         skip_rows: Option<usize>,
         n_rows: Option<usize>,
         predicate_pushdown: bool,
+        projection_pushdown: bool,
         name: &'static str,
     ) -> Result<Self> {
         let schema = Arc::new(match schema {
@@ -78,6 +79,8 @@ impl LogicalPlanBuilder {
                 output_schema: None,
                 with_columns: None,
                 predicate_pushdown,
+                projection_pushdown,
+                predicate: None
             },
         }
         .into())
