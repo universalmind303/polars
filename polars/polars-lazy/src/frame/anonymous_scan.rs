@@ -8,6 +8,7 @@ pub struct ScanArgsAnonymous {
     pub n_rows: Option<usize>,
     pub infer_schema_length: Option<usize>,
     pub schema: Option<Schema>,
+    pub predicate_pushdown: bool,
     pub row_count: Option<RowCount>,
     pub name: &'static str,
 }
@@ -20,6 +21,7 @@ impl Default for ScanArgsAnonymous {
             infer_schema_length: None,
             schema: None,
             row_count: None,
+            predicate_pushdown: false,
             name: "ANONYMOUS SCAN",
         }
     }
@@ -35,6 +37,7 @@ impl LazyFrame {
             args.infer_schema_length,
             args.skip_rows,
             args.n_rows,
+            args.predicate_pushdown,
             args.name,
         )?
         .build()

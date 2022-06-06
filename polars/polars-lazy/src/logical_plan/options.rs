@@ -172,5 +172,6 @@ pub struct AnonymousScanOptions {
     pub skip_rows: Option<usize>,
     pub n_rows: Option<usize>,
     pub with_columns: Option<Arc<Vec<String>>>,
+    pub predicate_pushdown: bool,
     pub(crate) fmt_str: &'static str,
 }

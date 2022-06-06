@@ -302,6 +302,34 @@ impl PredicatePushDown {
                 };
                 Ok(lp)
             }
+            AnonymousScan {
+                function,
+                schema,
+                output_schema,
+                options,
+                mut predicate,
+            } => {
+                if options.predicate_pushdown {
+                    predicate = predicate_at_scan(acc_predicates, predicate, expr_arena);
+                    let lp = AnonymousScan {
+                        function,
+                        schema,
+                        output_schema,
+                        options,
+                        predicate,
+                    };
+                    Ok(lp)
+                } else {
+                    let lp = AnonymousScan {
+                        function,
+                        schema,
+                        output_schema,
+                        options,
+                        predicate,
+                    };
+                    self.no_pushdown_restart_opt(lp, acc_predicates, lp_arena, expr_arena)
+                }
+            }
 
             Explode { input, columns, schema } => {
                 let condition = |name: Arc<str>| columns.iter().any(|s| s.as_str() == &*name);
@@ -463,11 +491,7 @@ impl PredicatePushDown {
             }
             #[cfg(feature = "python")]
             // python node does not yet support predicates
-             lp @ PythonScan {..} => {
-                self.no_pushdown_restart_opt(lp, acc_predicates, lp_arena, expr_arena)
-            }
-            lp @ AnonymousScan {..} => {
-                // TODO: add predicate pushdowns.
+            lp @ PythonScan {..} => {
                 self.no_pushdown_restart_opt(lp, acc_predicates, lp_arena, expr_arena)
             }
         }

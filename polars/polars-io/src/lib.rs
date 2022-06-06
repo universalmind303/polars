@@ -86,6 +86,36 @@ where
     fn finish(&mut self, df: &mut DataFrame) -> Result<()>;
 }
 
+pub trait LazyReader<T: Sized + Send>: Sized {
+    fn new(reader: T) -> Self;
+
+    /// Rechunk to a single chunk after Reading file.
+    #[must_use]
+    fn set_rechunk(self, _rechunk: bool) -> Self {
+        self
+    }
+
+    /// Stop reading when `n` rows are read.
+    fn with_n_rows(self, _num_rows: Option<usize>) -> Self {
+        self
+    }
+    /// Columns to select/ project
+    fn with_columns(self, _columns: Option<Vec<String>>) -> Self {
+        self
+    }
+    /// Add a `row_count` column.
+    fn with_row_count(self, _row_count: Option<RowCount>) -> Self {
+        self
+    }
+    
+    /// Set the reader's column projection. This counts from 0, meaning that
+    /// `vec![0, 4]` would select the 1st and 5th column.
+    fn with_projection(self, projection: Option<Vec<usize>>) -> Self {
+        self
+    }
+    fn finish(self) -> Result<DataFrame>;
+}
+
 pub trait WriterFactory {
     fn create_writer<W: Write + 'static>(&self, writer: W) -> Box<dyn SerWriter<W>>;
     fn extension(&self) -> PathBuf;
