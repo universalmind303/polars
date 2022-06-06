@@ -51,6 +51,30 @@ export interface ExprString {
    * └─────────┘
    * ```
    */
+
+  /**
+    Count all successive non-overlapping regex matches.
+    @param pattern A valid regex pattern
+    @returns UInt32 array. Contain null if original value is null or regex capture nothing.
+    @example
+    ```
+    >>> df = pl.DataFrame({"foo": ["123 bla 45 asd", "xyz 678 910t"]})
+    >>> df.select(
+    ...   pl.col("foo").str.countMatch(/\d/).alias("count_digits"),
+    ... )
+    shape: (2, 1)
+    ┌──────────────┐
+    │ count_digits │
+    │ ---          │
+    │ u32          │
+    ╞══════════════╡
+    │ 5            │
+    ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+    │ 6            │
+    └──────────────┘
+  ```
+   */
+  countMatch(pattern: string | RegExp): Expr
   decode(encoding: "hex" | "base64", strict?: boolean): Expr
   decode(options: {encoding: "hex" | "base64", strict?: boolean}): Expr
   /**
@@ -136,6 +160,31 @@ export interface ExprString {
    * ]
    * ```
    */
+
+  /**
+  Extract each successive non-overlapping regex match in an individual string as an array
+
+  @param pattern A valid regex pattern
+  @returns (List<Utf8>) array. Contain null if original value is null or regex capture nothing.
+  @example
+   ```
+   >>> df = pl.DataFrame({"foo": ["123 bla 45 asd", "xyz 678 910t"]})
+   >>> df.select(
+   ...   pl.col("foo").str.extractAll(/\d+/).alias("extracted_nrs"),
+   ... )
+   shape: (2, 1)
+   ┌────────────────┐
+   │ extracted_nrs  │
+   │ ---            │
+   │ list[str]      │
+   ╞════════════════╡
+   │ ["123", "45"]  │
+   ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+   │ ["678", "910"] │
+   └────────────────┘
+   ```
+   */
+  extractAll(pattern: string | RegExp): Expr
   jsonPathMatch(pat: string): Expr;
   /**  Get length of the string values in the Series. */
   lengths(): Expr;
@@ -197,6 +246,9 @@ export const ExprStringFunctions = (_expr: any): ExprString => {
     contains(pat: string | RegExp) {
       return wrap("strContains", regexToString(pat));
     },
+    countMatch(pat: string | RegExp) {
+      return wrap("strCountMatch", regexToString(pat));
+    },
     decode(arg, strict=false) {
       if(typeof arg === "string") {
         return handleDecode(arg, strict);
@@ -216,6 +268,9 @@ export const ExprStringFunctions = (_expr: any): ExprString => {
     },
     extract(pat: string | RegExp, groupIndex: number) {
       return wrap("strExtract", regexToString(pat), groupIndex);
+    },
+    extractAll(pat: string | RegExp) {
+      return wrap("strExtractAll", regexToString(pat));
     },
     jsonPathMatch(pat: string) {
       return wrap("strJsonPathMatch", pat);

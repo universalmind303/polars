@@ -750,6 +750,17 @@ impl JsExpr {
             .with_fmt("str.json_path_match")
             .into()
     }
+
+    #[napi]
+    pub fn str_extract_all(&self, pat: String) -> JsExpr {
+        self.inner.clone().str().extract_all(&pat).into()
+    }
+
+    #[napi]
+    pub fn count_match(&self, pat: String) -> JsExpr {
+        self.inner.clone().str().count_match(&pat).into()
+    }
+
     #[napi]
     pub fn str_extract(&self, pat: String, group_index: i64) -> JsExpr {
         self.inner
@@ -1184,7 +1195,13 @@ impl JsExpr {
     }
 
     #[napi]
-    pub fn sample_frac(&self, frac: f64, with_replacement: bool, shuffle: bool, seed: Option<i64>) -> JsExpr {
+    pub fn sample_frac(
+        &self,
+        frac: f64,
+        with_replacement: bool,
+        shuffle: bool,
+        seed: Option<i64>,
+    ) -> JsExpr {
         let seed = seed.map(|s| s as u64);
         self.inner
             .clone()

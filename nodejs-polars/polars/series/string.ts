@@ -45,6 +45,26 @@ export interface StringFunctions {
    * ]
    * ```
    */
+
+  /**
+    Count all successive non-overlapping regex matches.
+
+    @param pattern A valid regex pattern
+    @returns UInt32 array. Contain null if original value is null or regex capture nothing.
+    @example
+    ```
+    >>> s = pl.Series("foo", ["123 bla 45 asd", "xyz 678 910t"])
+    >>> # count digits
+    >>> s.str.countMatch(/\d/)
+    shape: (2,)
+    Series: 'foo' [u32]
+    [
+        5
+        6
+    ]
+    ```
+   */
+  countMatch(pattern: string | RegExp): Series
   decode(encoding: "hex" | "base64", strict?: boolean): Series
   decode(options: {encoding: "hex" | "base64", strict?: boolean}): Series
   /**
@@ -95,6 +115,27 @@ export interface StringFunctions {
    * ```
    */
   extract(pattern: string | RegExp, groupIndex: number): Series
+  /**
+   *
+   * @param pattern A valid regex pattern
+   * @returns List[Utf8] array. Contain null if original value is null or regex capture nothing.
+   * @example
+   * ```
+     >>> s = pl.Series("foo", ["123 bla 45 asd", "xyz 678 910t"])
+     >>> s.str.extractAll(/\d+/)
+     shape: (2, 1)
+     ┌────────────────┐
+     │ extracted_nrs  │
+     │ ---            │
+     │ list[str]      │
+     ╞════════════════╡
+     │ ["123", "45"]  │
+     ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+     │ ["678", "910"] │
+     └────────────────┘
+    ```
+   */
+  extractAll(pattern: string | RegExp): Series
   /**
    * Extract the first match of json string with provided JSONPath expression.
    * Throw errors if encounter invalid json strings.
@@ -206,6 +247,17 @@ export const StringFunctions = (_s: any): StringFunctions => {
     contains(pat: string | RegExp) {
       return wrap("strContains", regexToString(pat));
     },
+    countMatch(pat: string| RegExp) {
+      return _Series(_s)
+        .toFrame()
+        .select(
+          col(_s.name)
+            .str
+            .countMatch(pat)
+            .as(_s.name)
+        )
+        .getColumn(_s.name);
+    },
     decode(arg, strict=false) {
       if(typeof arg === "string") {
         return handleDecode(arg, strict);
@@ -226,6 +278,16 @@ export const StringFunctions = (_s: any): StringFunctions => {
     extract(pat: string | RegExp, groupIndex: number) {
       return wrap("strExtract", regexToString(pat), groupIndex);
     },
+    extractAll(pat: string | RegExp) {
+      return _Series(_s)
+        .toFrame()
+        .select(
+          col(_s.name)
+            .str
+            .extractAll(pat)
+            .as(_s.name)
+        )
+        .getColumn(_s.name);    },
     jsonPathMatch(pat: string) {
 
       return wrap("strJsonPathMatch", pat);
