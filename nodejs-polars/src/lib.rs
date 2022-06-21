@@ -1,8 +1,8 @@
-#![allow(clippy::nonstandard_macro_braces)] // needed because clippy does not understand proc macro of pyo3
+#![allow(clippy::nonstandard_macro_braces)]
 #![allow(clippy::transmute_undefined_repr)]
 
+pub extern crate polars;
 extern crate core;
-extern crate polars;
 
 #[macro_use]
 extern crate napi_derive;
@@ -30,3 +30,12 @@ pub mod list_construction;
 pub mod prelude;
 pub mod series;
 pub mod utils;
+pub use polars_core;
+pub mod export {
+    pub use crate::dataframe::JsDataFrame;
+    pub use crate::lazy::dataframe::JsLazyFrame;
+    pub use polars::prelude::LazyFrame;
+    pub use polars;
+    pub use polars_core;
+}
+

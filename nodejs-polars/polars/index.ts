@@ -1,17 +1,22 @@
 import * as series from "./series/series";
 import * as df from "./dataframe";
-import { DataType } from "./datatypes";
+import {DataType} from "./datatypes";
 import * as func from "./functions";
 import * as io from "./io";
 import * as cfg from "./cfg";
 import * as ldf from "./lazy/dataframe";
 import pli from "./internals/polars_internal";
-import  {
+import {
   funcs as lazy,
   Expr as lazyExpr,
   GroupBy as lazyGroupBy,
   when as _when
 } from "./lazy";
+
+function pl<T>(this: any, extraData: T) {
+  global.__pl__ = pl;
+  return Object.assign(pl, extraData)
+}
 
 
 namespace pl {
@@ -26,24 +31,24 @@ namespace pl {
   export import Config = cfg.Config;
   export import Int8 = DataType.Int8
   export import Int16 = DataType.Int16
-  export import Int32 =  DataType.Int32;
-  export import Int64 =  DataType.Int64;
-  export import UInt8 =  DataType.UInt8;
-  export import UInt16 =  DataType.UInt16;
-  export import UInt32 =  DataType.UInt32;
-  export import UInt64 =  DataType.UInt64;
-  export import Float32 =  DataType.Float32;
-  export import Float64 =  DataType.Float64;
-  export import Bool =  DataType.Bool;
-  export import Utf8 =  DataType.Utf8;
-  export import List =  DataType.List;
+  export import Int32 = DataType.Int32;
+  export import Int64 = DataType.Int64;
+  export import UInt8 = DataType.UInt8;
+  export import UInt16 = DataType.UInt16;
+  export import UInt32 = DataType.UInt32;
+  export import UInt64 = DataType.UInt64;
+  export import Float32 = DataType.Float32;
+  export import Float64 = DataType.Float64;
+  export import Bool = DataType.Bool;
+  export import Utf8 = DataType.Utf8;
+  export import List = DataType.List;
   export import Date = DataType.Date;
   export import Datetime = DataType.Datetime;
   export import Time = DataType.Time;
   export import Object = DataType.Object;
   export import Categorical = DataType.Categorical;
-  export import repeat =  func.repeat;
-  export import concat =  func.concat;
+  export import repeat = func.repeat;
+  export import concat = func.concat;
 
   // // IO
   export import scanCSV = io.scanCSV;
