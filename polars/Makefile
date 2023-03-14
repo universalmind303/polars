@@ -34,20 +34,19 @@ clippy-default:
 	cargo clippy
 
 test:  ## Run tests
-	POLARS_MAX_THREADS=4 cargo t -p polars-core test_4_threads
-	cargo test --all-features \
+	POLARS_MAX_THREADS=4 cargo nextest run -p polars-core test_4_threads
+	cargo nextest run  --all-features \
 	    -p polars-lazy \
 	    -p polars-io \
 	    -p polars-core \
 	    -p polars-arrow \
 	    -p polars-time \
 	    -p polars-utils \
-	    -p polars-row \
-	    -- \
-	    --test-threads=2
+	    -p polars-row 
+	    
 
 integration-tests:
-	cargo t --all-features --test it -- --test-threads=2
+	cargo nextest run --test-threads 2 --all-features --test it -- --test-threads 2
 
 miri:
 	# not tested on all features because miri does not support SIMD
