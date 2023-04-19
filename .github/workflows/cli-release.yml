@@ -72,8 +72,7 @@ jobs:
           command: deb
           args: -p polars-cli --no-build --no-strip --output=. --target=${{ matrix.target }}
 
-      - name: debugtarget
-        run: cd target && ls; ls release; ls debug; ls ${{ matrix.target }};
+
       - name: Package (*nix)
         if: runner.os != 'Windows'
         run: >

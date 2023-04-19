@@ -24,12 +24,12 @@ exclude-labels:
   - skip-changelog
   - release
 
-change-template: '- $TITLE (#$NUMBER)'
+change-template: "- $TITLE (#$NUMBER)"
 change-title-escapes: '\<*_&'
 replacers:
   # Remove conventional commits from titles
   - search: '/- (build|chore|ci|docs|feat|fix|perf|refactor|release|revert|style|test)(\(.*\))?(\!)?\: /g'
-    replace: '- '
+    replace: "- "
 
 version-resolver:
   minor:
@@ -51,40 +51,40 @@ autolabeler:
       - '/^(build|chore|ci|docs|feat|fix|perf|refactor|release|revert|style|test)(\(.*\))?\!\: /'
   - label: build
     title:
-      - '/^build/'
+      - "/^build/"
   - label: chore
     title:
-      - '/^chore/'
+      - "/^chore/"
   - label: ci
     title:
-      - '/^ci/'
+      - "/^ci/"
   - label: documentation
     title:
-      - '/^docs/'
+      - "/^docs/"
   - label: enhancement
     title:
-      - '/^feat/'
+      - "/^feat/"
   - label: fix
     title:
-      - '/^fix/'
+      - "/^fix/"
   - label: performance
     title:
-      - '/^perf/'
+      - "/^perf/"
   - label: refactor
     title:
-      - '/^refactor/'
+      - "/^refactor/"
   - label: release
     title:
-      - '/^release/'
+      - "/^release/"
   - label: revert
     title:
-      - '/^revert/'
+      - "/^revert/"
   - label: style
     title:
-      - '/^style/'
+      - "/^style/"
   - label: test
     title:
-      - '/^test/'
+      - "/^test/"
 
 template: |
   $CHANGES
