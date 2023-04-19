@@ -35,8 +35,11 @@ struct Args {
 #[derive(ValueEnum, Debug, Default, Clone)]
 enum OutputMode {
     Csv,
+    #[cfg(feature = "json")]
     Json,
+    #[cfg(feature = "parquet")]
     Parquet,
+    #[cfg(feature = "ipc")]
     Arrow,
     #[default]
     Table,
@@ -66,8 +69,11 @@ impl OutputMode {
             let mut w = io::BufWriter::new(w);
             match self {
                 OutputMode::Csv => CsvWriter::new(&mut w).finish(&mut df),
+                #[cfg(feature = "json")]
                 OutputMode::Json => JsonWriter::new(&mut w).finish(&mut df),
+                #[cfg(feature = "parquet")]
                 OutputMode::Parquet => ParquetWriter::new(&mut w).finish(&mut df).map(|_| ()),
+                #[cfg(feature = "ipc")]
                 OutputMode::Arrow => IpcWriter::new(w).finish(&mut df),
                 OutputMode::Table => {
                     let _tmp =
@@ -84,6 +90,7 @@ impl OutputMode {
                     use std::io::Write;
                     return write!(&mut w, "{df}");
                 }
+                _ => unreachable!(),
             }
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
         };
@@ -103,8 +110,11 @@ impl FromStr for OutputMode {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "csv" => Ok(OutputMode::Csv),
+            #[cfg(feature = "json")]
             "json" => Ok(OutputMode::Json),
+            #[cfg(feature = "parquet")]
             "parquet" => Ok(OutputMode::Parquet),
+            #[cfg(feature = "ipc")]
             "arrow" => Ok(OutputMode::Arrow),
             "table" => Ok(OutputMode::Table),
             _ => Err(format!("Invalid output mode: {}", s)),
