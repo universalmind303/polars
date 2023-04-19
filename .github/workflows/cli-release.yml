@@ -81,7 +81,7 @@ jobs:
         if: runner.os != 'Windows'
         run: >
           tar -cv
-          CHANGELOG.md LICENSE README.md
+          LICENSE README.md
           -C target/${{ matrix.target }}/release/ polars
           | gzip --best
           > 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.tar.gz'
@@ -89,7 +89,7 @@ jobs:
         if: runner.os == 'Windows'
         run: >
           7z a 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.zip'
-          CHANGELOG.md LICENSE README.md
+          LICENSE README.md
           ./target/${{ matrix.target }}/release/polars.exe
       - name: Upload artifact
         uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2.3.1
