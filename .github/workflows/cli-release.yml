@@ -10,9 +10,6 @@ permissions:
 
 jobs:
   release:
-    defaults:
-      run:
-        working-directory: polars-cli
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
