@@ -76,11 +76,14 @@ jobs:
         with:
           command: deb
           args: -p polars-cli --no-build --no-strip --output=. --target=${{ matrix.target }}
-
+      - name: debug
+        run: ls
+      - name: debugtarget
+        run: cd target && ls
       - name: Package (*nix)
         if: runner.os != 'Windows'
         run: >
-          tar -cv LICENSE README.md -C target/${{ matrix.target }}/debug/ polars | gzip > 'polars.tar.gz' 
+          tar -cv LICENSE README.md -C target/debug/ polars | gzip > 'polars.tar.gz' 
           | gzip --best
           > 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.tar.gz'
       - name: Package (Windows)
@@ -88,7 +91,7 @@ jobs:
         run: >
           7z a 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.zip'
           LICENSE README.md
-          ./target/${{ matrix.target }}/debug/polars.exe
+          ./target/debug/polars.exe
       - name: Upload artifact
         uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2.3.1
         with:
