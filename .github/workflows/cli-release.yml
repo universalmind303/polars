@@ -58,7 +58,7 @@ jobs:
         uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1.0.3
         with:
           command: build
-          args: -p polars-cli --target=${{ matrix.target }} --color=always
+          args: -p polars-cli --release --target=${{ matrix.target }} --color=always
           use-cross: ${{ runner.os == 'Linux' }}
 
       - name: Install cargo-deb
@@ -73,14 +73,13 @@ jobs:
         with:
           command: deb
           args: -p polars-cli --no-build --no-strip --output=. --target=${{ matrix.target }}
-      - name: debug
-        run: ls
+
       - name: debugtarget
-        run: cd target && ls;
+        run: cd target && ls; ls release; ls debug; ls ${{ matrix.target }};
       - name: Package (*nix)
         if: runner.os != 'Windows'
         run: >
-          tar -cv LICENSE README.md -C target/${{ matrix.target }}/debug/ polars | gzip > 'polars.tar.gz' 
+          tar -cv LICENSE README.md -C target/${{ matrix.target }}/release/ polars | gzip > 'polars.tar.gz' 
           | gzip --best
           > 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.tar.gz'
       - name: Package (Windows)
@@ -88,7 +87,7 @@ jobs:
         run: >
           7z a 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.zip'
           LICENSE README.md
-          ./target/${{ matrix.target }}/debug/polars.exe
+          ./target/${{ matrix.target }}/release/polars.exe
       - name: Upload artifact
         uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2.3.1
         with:
