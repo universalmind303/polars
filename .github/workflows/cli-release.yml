@@ -63,7 +63,6 @@ jobs:
 
       - name: Build binary
         uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1.0.3
-
         with:
           command: build
           args: -p polars-cli --release  --target=${{ matrix.target }} --color=always --verbose
@@ -80,26 +79,7 @@ jobs:
         uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1.0.3
         with:
           command: deb
-          args: --no-build --no-strip --output=. --target=${{ matrix.target }}
-
-      - name: Package (*nix)
-        if: runner.os != 'Windows'
-        run: >
-          tar -cv
-          CHANGELOG.md LICENSE README.md
-          man/
-          -C contrib/ completions/ -C ../
-          -C target/${{ matrix.target }}/release/ zoxide
-          | gzip --best
-          > 'zoxide-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.tar.gz'
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        run: >
-          7z a 'zoxide-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.zip'
-          CHANGELOG.md LICENSE README.md
-          ./man/
-          ./contrib/completions/
-          ./target/${{ matrix.target }}/release/zoxide.exe
+          args: -p polars-cli --no-build --no-strip --output=. --target=${{ matrix.target }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2.3.1
@@ -111,7 +91,7 @@ jobs:
             *.zip
 
       - name: Create release
-        if: ${{ github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'chore(release)') }}
+        
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           draft: true
