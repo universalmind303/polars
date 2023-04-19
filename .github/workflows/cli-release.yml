@@ -81,9 +81,7 @@ jobs:
         if: runner.os != 'Windows'
         run: >
           ls
-          tar -cv
-          LICENSE README.md
-          -C polars-cli/target/${{ matrix.target }}/release/ polars
+          tar -cv LICENSE README.md -C target/${{ matrix.target }}/release/ polars-cli | gzip > 'polars.tar.gz' 
           | gzip --best
           > 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.tar.gz'
       - name: Package (Windows)
@@ -92,7 +90,7 @@ jobs:
           ls
           7z a 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.zip'
           LICENSE README.md
-          ./polars-cli/target/${{ matrix.target }}/release/polars.exe
+          ./target/${{ matrix.target }}/release/polars-cli.exe
       - name: Upload artifact
         uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2.3.1
         with:
