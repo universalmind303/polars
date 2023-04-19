@@ -2,7 +2,6 @@ name: release
 on:
   push:
     branches: [cli-cicd]
-  pull_request:
   workflow_dispatch:
 env:
   CARGO_INCREMENTAL: 0
