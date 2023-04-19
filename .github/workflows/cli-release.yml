@@ -61,7 +61,7 @@ jobs:
         uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1.0.3
         with:
           command: build
-          args: -p polars-cli --release  --target=${{ matrix.target }} --color=always --verbose
+          args: -p polars-cli --target=${{ matrix.target }} --color=always --verbose
           use-cross: ${{ runner.os == 'Linux' }}
 
       - name: Install cargo-deb
@@ -80,6 +80,7 @@ jobs:
       - name: Package (*nix)
         if: runner.os != 'Windows'
         run: >
+          ls
           tar -cv
           LICENSE README.md
           -C polars-cli/target/${{ matrix.target }}/release/ polars
@@ -88,6 +89,7 @@ jobs:
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: >
+          ls
           7z a 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.zip'
           LICENSE README.md
           ./polars-cli/target/${{ matrix.target }}/release/polars.exe
