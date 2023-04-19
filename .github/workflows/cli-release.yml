@@ -80,14 +80,12 @@ jobs:
       - name: Package (*nix)
         if: runner.os != 'Windows'
         run: >
-          ls
           tar -cv LICENSE README.md -C target/${{ matrix.target }}/release/ polars-cli | gzip > 'polars.tar.gz' 
           | gzip --best
           > 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.tar.gz'
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: >
-          ls
           7z a 'polars-${{ steps.get_version.outputs.value }}-${{ matrix.target }}.zip'
           LICENSE README.md
           ./target/${{ matrix.target }}/release/polars-cli.exe
