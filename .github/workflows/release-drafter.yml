@@ -29,3 +29,10 @@ jobs:
           disable-autolabeler: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Draft CLI release
+        uses: release-drafter/release-drafter@v5
+        with:
+          config-name: release-drafter-cli.yml
+          disable-autolabeler: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

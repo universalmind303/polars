@@ -1,0 +1,8 @@
+_extends: polars:.github/release-drafter.yml
+
+name-template: Polars CLI $RESOLVED_VERSION
+tag-template: cli-$RESOLVED_VERSION
+tag-prefix: cli-
+
+include-labels:
+  - cli

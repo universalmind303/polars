@@ -43,6 +43,9 @@ autolabeler:
   - label: python
     title:
       - '/^(build|chore|ci|docs|feat|fix|perf|refactor|release|revert|style|test)\(.*python.*\)/'
+  - label: cli
+    title:
+      - '/^(build|chore|ci|docs|feat|fix|perf|refactor|release|revert|style|test)\(.*cli.*\)/'    
   - label: breaking
     title:
       - '/^(build|chore|ci|docs|feat|fix|perf|refactor|release|revert|style|test)(\(.*\))?\!\: /'
